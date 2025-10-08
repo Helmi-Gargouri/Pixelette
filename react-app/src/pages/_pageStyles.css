@@ -1,0 +1,10 @@
+/* Per-page helper styles used by generated components.
+   If you copied the original template assets into `public/assets`, uncomment the import below
+   to include the original CSS globally for each generated page. */
+
+/* @import url('/assets/css/style.css'); */
+
+/* Minimal fallback so imports resolve */
+.template-page {
+  box-sizing: border-box;
+}
