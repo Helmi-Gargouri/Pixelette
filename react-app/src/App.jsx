@@ -1,10 +1,16 @@
 import React from 'react'
 import { Routes, Route, Link } from 'react-router-dom'
 import StaticPage from './components/StaticPage'
-import Register from './pages/Register';
-import Login from './pages/Login';
-import Profile from './pages/Profile';
+import Register from './pages/Auth/Register';
+import Login from './pages/Auth/Login';
+import Profile from './pages/Auth/Profile';
 import UsersList from './pages/UsersList';
+import RequestReset from './pages/Auth/RequestReset';
+import ResetPassword from './pages/Auth/ResetPassword';
+import Verify2FA from './pages/Auth/Verify2FA';
+import AdminDemands from './pages/AdminDemands';
+import ForgotPassword from './pages/Auth/ForgotPassword';
+import CodeVerification from './pages/Auth/CodeVerification';
 
 export default function App() {
   return (
@@ -42,8 +48,13 @@ export default function App() {
   <Route path="/register" element={<Register />} />
   <Route path="/login" element={<Login />} />
   <Route path="/profile" element={<Profile />} />
-    <Route path="/users" element={<UsersList />} />
-
+  <Route path="/users" element={<UsersList />} />
+  <Route path="/request-reset" element={<RequestReset />} />
+  <Route path="/reset-password" element={<ResetPassword />} />
+  <Route path="/verify-2fa" element={<Verify2FA />} />
+  <Route path="/demandes" element={<AdminDemands />} />
+  <Route path="/forgot-password" element={<ForgotPassword />} />
+  <Route path="/code-verification" element={<CodeVerification />} />
   <Route path="*" element={<div>Not Found</div>} />
       </Routes>
     </div>

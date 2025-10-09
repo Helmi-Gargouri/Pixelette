@@ -1,31 +1,39 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
-import './_pageStyles.css';
+import '../_pageStyles.css';  
 
-const Register = () => {
-  const [nom, setNom] = useState('');
-  const [prenom, setPrenom] = useState('');
+const Login = () => {
   const [email, setEmail] = useState('');
-  const [telephone, setTelephone] = useState('');
   const [password, setPassword] = useState('');
-  const [passwordConfirm, setPasswordConfirm] = useState('');
   const [message, setMessage] = useState('');
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await axios.post('http://localhost:8000/api/utilisateurs/', 
-        { nom, prenom, email, telephone, password, password_confirm: passwordConfirm },
+      const response = await axios.post('http://localhost:8000/api/utilisateurs/login/',
+        { email, password },
         { withCredentials: true }
       );
-      setMessage('Inscription réussie ! Redirection...');
-      setTimeout(() => navigate('/login'), 1500);
+      if (response.data.token) {
+        // Direct login (2FA en pause)
+        localStorage.setItem('token', response.data.token);
+        setMessage(response.data.message);
+        setTimeout(() => navigate('/profile'), 1500);
+      } else {
+        // ← COMMENTE ÇA (pas besoin en pause) :
+        // setMessage(response.data.message);
+        // navigate('/verify-2fa', { state: { ... } });
+        console.log('2FA skipped - direct to profile');  // Debug
+        localStorage.setItem('token', response.data.token);  // Si token existe
+        setTimeout(() => navigate('/profile'), 1500);
+      }
     } catch (error) {
-      setMessage('Erreur : ' + (error.response?.data?.error || error.response?.data?.password || 'Échec'));
+      setMessage('Erreur : ' + (error.response?.data?.error || 'Échec de connexion'));
     }
   };
+
 
   const messageClass = message
     ? (message.toLowerCase().includes('erreur') ? 'message message-error' : 'message message-success')
@@ -54,11 +62,11 @@ const Register = () => {
         background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
         display: 'flex', 
         alignItems: 'center',
-        justifyContent: 'center',
+        justifyContent: 'center', 
         position: 'relative',
-        padding: '40px 0',
+        padding: '20px 0',
         marginTop: '-80px',
-        paddingTop: '120px'
+        paddingTop: '100px'
       }}>
         <div className="hero-thumb1" style={{ 
           position: 'absolute', 
@@ -77,124 +85,41 @@ const Register = () => {
           }} />
         </div>
 
-        <div className="container" style={{ 
+        <div className="container-fluid" style={{ 
           position: 'relative', 
           zIndex: 2,
           display: 'flex',
           justifyContent: 'center',
-          alignItems: 'center'
+          alignItems: 'center',
+          minHeight: 'calc(100vh - 180px)'
         }}>
           <div className="row justify-content-center w-100">
-            <div className="col-xl-5 col-lg-6 col-md-8 col-sm-10">
-              {/* Carte d'inscription avec plus d'espace */}
+            <div className="col-12">
               <div className="hero-style1 auth-form-wrapper" style={{ 
                 background: 'rgba(255, 255, 255, 0.95)', 
-                padding: '50px 45px', 
+                padding: '50px 40px', 
                 borderRadius: '15px', 
                 boxShadow: '0 20px 50px rgba(0, 0, 0, 0.15)',
                 backdropFilter: 'blur(10px)',
                 textAlign: 'center',
-                width: '100%',
-                maxWidth: '500px', // Largeur augmentée
-                margin: '0 auto'
+                width: '100%'
               }}>
                 <h1 className="auth-title hero-title" style={{ 
                   color: 'var(--title-color, #373E43)', 
-                  marginBottom: '40px', 
+                  marginBottom: '35px', 
                   fontSize: '2.2em', 
                   fontWeight: 300,
                   fontFamily: 'var(--title-font, "Jost", sans-serif)',
                   letterSpacing: '0.5px'
                 }}>
-                  S'inscrire
+                  PIXELETTE
                 </h1>
                 
                 <form onSubmit={handleSubmit} className="auth-form">
-                  {/* Prénom */}
-                  <div className="form-group mb-25"> {/* Espacement augmenté */}
+                  <div className="form-group mb-25">
                     <label className="form-label" style={{ 
                       display: 'block', 
-                      marginBottom: '12px', // Espacement augmenté
-                      color: 'var(--body-color, #7B7E86)', 
-                      fontWeight: 500,
-                      fontFamily: 'var(--body-font, "Roboto", sans-serif)',
-                      fontSize: '0.95em',
-                      textAlign: 'left'
-                    }}>
-                      Prénom
-                    </label>
-                    <input
-                      type="text"
-                      value={prenom}
-                      onChange={(e) => setPrenom(e.target.value)}
-                      required
-                      style={{ 
-                        width: '100%',
-                        padding: '16px 20px', // Padding horizontal augmenté
-                        border: '2px solid var(--border-color, #D9D9D9)', 
-                        borderRadius: '10px',
-                        fontSize: '16px',
-                        transition: 'all 0.3s ease',
-                        background: '#fff',
-                        boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.05)',
-                        textAlign: 'left'
-                      }}
-                      onFocus={(e) => {
-                        e.target.style.borderColor = 'var(--theme-color, #C57642)';
-                        e.target.style.boxShadow = '0 0 0 3px rgba(197, 118, 66, 0.1)';
-                      }}
-                      onBlur={(e) => {
-                        e.target.style.borderColor = 'var(--border-color, #D9D9D9)';
-                        e.target.style.boxShadow = 'inset 0 2px 4px rgba(0,0,0,0.05)';
-                      }}
-                    />
-                  </div>
-
-                  {/* Nom */}
-                  <div className="form-group mb-25"> {/* Espacement augmenté */}
-                    <label className="form-label" style={{ 
-                      display: 'block', 
-                      marginBottom: '12px',
-                      color: 'var(--body-color, #7B7E86)', 
-                      fontWeight: 500,
-                      fontFamily: 'var(--body-font, "Roboto", sans-serif)',
-                      fontSize: '0.95em',
-                      textAlign: 'left'
-                    }}>
-                      Nom
-                    </label>
-                    <input
-                      type="text"
-                      value={nom}
-                      onChange={(e) => setNom(e.target.value)}
-                      required
-                      style={{ 
-                        width: '100%',
-                        padding: '16px 20px',
-                        border: '2px solid var(--border-color, #D9D9D9)', 
-                        borderRadius: '10px',
-                        fontSize: '16px',
-                        transition: 'all 0.3s ease',
-                        background: '#fff',
-                        boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.05)',
-                        textAlign: 'left'
-                      }}
-                      onFocus={(e) => {
-                        e.target.style.borderColor = 'var(--theme-color, #C57642)';
-                        e.target.style.boxShadow = '0 0 0 3px rgba(197, 118, 66, 0.1)';
-                      }}
-                      onBlur={(e) => {
-                        e.target.style.borderColor = 'var(--border-color, #D9D9D9)';
-                        e.target.style.boxShadow = 'inset 0 2px 4px rgba(0,0,0,0.05)';
-                      }}
-                    />
-                  </div>
-
-                  {/* Email */}
-                  <div className="form-group mb-25"> {/* Espacement augmenté */}
-                    <label className="form-label" style={{ 
-                      display: 'block', 
-                      marginBottom: '12px',
+                      marginBottom: '10px',
                       color: 'var(--body-color, #7B7E86)', 
                       fontWeight: 500,
                       fontFamily: 'var(--body-font, "Roboto", sans-serif)',
@@ -204,13 +129,15 @@ const Register = () => {
                       Email
                     </label>
                     <input
+                      className="form-input"
                       type="email"
+                      placeholder="Votre adresse email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       required
                       style={{ 
                         width: '100%',
-                        padding: '16px 20px',
+                        padding: '16px',
                         border: '2px solid var(--border-color, #D9D9D9)', 
                         borderRadius: '10px',
                         fontSize: '16px',
@@ -229,51 +156,11 @@ const Register = () => {
                       }}
                     />
                   </div>
-
-                  {/* Téléphone */}
-                  <div className="form-group mb-25"> {/* Espacement augmenté */}
+                  
+                  <div className="form-group mb-25">
                     <label className="form-label" style={{ 
                       display: 'block', 
-                      marginBottom: '12px',
-                      color: 'var(--body-color, #7B7E86)', 
-                      fontWeight: 500,
-                      fontFamily: 'var(--body-font, "Roboto", sans-serif)',
-                      fontSize: '0.95em',
-                      textAlign: 'left'
-                    }}>
-                      Téléphone (optionnel)
-                    </label>
-                    <input
-                      type="tel"
-                      value={telephone}
-                      onChange={(e) => setTelephone(e.target.value)}
-                      style={{ 
-                        width: '100%',
-                        padding: '16px 20px',
-                        border: '2px solid var(--border-color, #D9D9D9)', 
-                        borderRadius: '10px',
-                        fontSize: '16px',
-                        transition: 'all 0.3s ease',
-                        background: '#fff',
-                        boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.05)',
-                        textAlign: 'left'
-                      }}
-                      onFocus={(e) => {
-                        e.target.style.borderColor = 'var(--theme-color, #C57642)';
-                        e.target.style.boxShadow = '0 0 0 3px rgba(197, 118, 66, 0.1)';
-                      }}
-                      onBlur={(e) => {
-                        e.target.style.borderColor = 'var(--border-color, #D9D9D9)';
-                        e.target.style.boxShadow = 'inset 0 2px 4px rgba(0,0,0,0.05)';
-                      }}
-                    />
-                  </div>
-
-                  {/* Mot de passe */}
-                  <div className="form-group mb-25"> {/* Espacement augmenté */}
-                    <label className="form-label" style={{ 
-                      display: 'block', 
-                      marginBottom: '12px',
+                      marginBottom: '10px',
                       color: 'var(--body-color, #7B7E86)', 
                       fontWeight: 500,
                       fontFamily: 'var(--body-font, "Roboto", sans-serif)',
@@ -283,53 +170,15 @@ const Register = () => {
                       Mot de passe
                     </label>
                     <input
+                      className="form-input"
                       type="password"
+                      placeholder="Votre mot de passe"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       required
                       style={{ 
                         width: '100%',
-                        padding: '16px 20px',
-                        border: '2px solid var(--border-color, #D9D9D9)', 
-                        borderRadius: '10px',
-                        fontSize: '16px',
-                        transition: 'all 0.3s ease',
-                        background: '#fff',
-                        boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.05)',
-                        textAlign: 'left'
-                      }}
-                      onFocus={(e) => {
-                        e.target.style.borderColor = 'var(--theme-color, #C57642)';
-                        e.target.style.boxShadow = '0 0 0 3px rgba(197, 118, 66, 0.1)';
-                      }}
-                      onBlur={(e) => {
-                        e.target.style.borderColor = 'var(--border-color, #D9D9D9)';
-                        e.target.style.boxShadow = 'inset 0 2px 4px rgba(0,0,0,0.05)';
-                      }}
-                    />
-                  </div>
-
-                  {/* Confirmation mot de passe */}
-                  <div className="form-group mb-30"> {/* Espacement avant bouton augmenté */}
-                    <label className="form-label" style={{ 
-                      display: 'block', 
-                      marginBottom: '12px',
-                      color: 'var(--body-color, #7B7E86)', 
-                      fontWeight: 500,
-                      fontFamily: 'var(--body-font, "Roboto", sans-serif)',
-                      fontSize: '0.95em',
-                      textAlign: 'left'
-                    }}>
-                      Confirmer le mot de passe
-                    </label>
-                    <input
-                      type="password"
-                      value={passwordConfirm}
-                      onChange={(e) => setPasswordConfirm(e.target.value)}
-                      required
-                      style={{ 
-                        width: '100%',
-                        padding: '16px 20px',
+                        padding: '16px',
                         border: '2px solid var(--border-color, #D9D9D9)', 
                         borderRadius: '10px',
                         fontSize: '16px',
@@ -354,7 +203,7 @@ const Register = () => {
                     className="btn-primary btn" 
                     style={{ 
                       width: '100%',
-                      padding: '18px', // Padding augmenté
+                      padding: '16px',
                       background: 'linear-gradient(135deg, var(--theme-color, #C57642) 0%, #a55e35 100%)',
                       color: '#fff', 
                       border: 'none', 
@@ -380,20 +229,20 @@ const Register = () => {
                       e.target.style.boxShadow = '0 4px 15px rgba(197, 118, 66, 0.3)';
                     }}
                   >
-                    S'inscrire
+                    Se connecter
                   </button>
                 </form>
 
                 <p style={{ 
                   textAlign: 'center', 
-                  marginTop: '30px', // Espacement augmenté
+                  marginTop: '25px', 
                   color: 'var(--body-color, #7B7E86)', 
                   fontFamily: 'var(--body-font, "Roboto", sans-serif)',
                   fontSize: '0.95em'
                 }}>
-                  Déjà inscrit ? <a 
+                  Pas de compte ? <a 
                     className="link" 
-                    href="/login" 
+                    href="/register" 
                     style={{ 
                       color: 'var(--theme-color, #C57642)', 
                       textDecoration: 'none', 
@@ -403,13 +252,34 @@ const Register = () => {
                     onMouseOver={(e) => e.target.style.color = '#a55e35'}
                     onMouseOut={(e) => e.target.style.color = 'var(--theme-color, #C57642)'}
                   >
-                    Se connecter
+                    S'inscrire
                   </a>
                 </p>
-                
+
+<div className="text-center mt-3">
+  <button
+    onClick={() => navigate('/forgot-password')}
+    style={{
+      color: 'var(--theme-color, #C57642)',
+      background: 'none',
+      border: 'none',
+      fontWeight: 500,
+      fontFamily: 'var(--body-font, "Roboto", sans-serif)',
+      fontSize: '0.95em',
+      cursor: 'pointer',
+      transition: 'color 0.3s ease'
+    }}
+    onMouseOver={(e) => e.target.style.color = '#a55e35'}
+    onMouseOut={(e) => e.target.style.color = 'var(--theme-color, #C57642)'}
+  >
+    Mot de passe oublié ?
+  </button>
+</div>
+
+
                 {message && <p className={messageClass} role="status" style={{ 
                   textAlign: 'center', 
-                  marginTop: '25px', // Espacement augmenté
+                  marginTop: '20px', 
                   padding: '12px',
                   borderRadius: '8px', 
                   fontWeight: 500,
@@ -459,4 +329,4 @@ const Register = () => {
   );
 };
 
-export default Register;
+export default Login;

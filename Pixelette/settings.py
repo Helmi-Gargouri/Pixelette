@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 """
 
 from pathlib import Path
+from decouple import config
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -164,6 +165,15 @@ CORS_ALLOW_CREDENTIALS = True  # Active cookies/session pour axios withCredentia
 # Session config (ajoute à la fin)
 SESSION_COOKIE_AGE = 3600  # 1h
 SESSION_SAVE_EVERY_REQUEST = True
+
+
+EMAIL_BACKEND = config('EMAIL_BACKEND')
+EMAIL_HOST = config('EMAIL_HOST')
+EMAIL_PORT = config('EMAIL_PORT', cast=int)
+EMAIL_HOST_USER = config('EMAIL_HOST_USER')
+EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD')
+EMAIL_USE_TLS = config('EMAIL_USE_TLS', cast=bool)
+DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL')
 
 # Autoriser le frontend React à accéder à l'API Django pendant le développement
 #CORS_ALLOW_ALL_ORIGINS = True

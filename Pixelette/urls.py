@@ -19,7 +19,8 @@ from django.urls import path, include
 from rest_framework import routers
 from django.conf import settings 
 from django.conf.urls.static import static  
-from .views import UtilisateurViewSet, OeuvreViewSet, GalerieViewSet, InteractionViewSet, StatistiqueViewSet
+from .views import UtilisateurViewSet, OeuvreViewSet, GalerieViewSet, InteractionViewSet, StatistiqueViewSet,DemandeRoleViewSet
+
 
 router = routers.DefaultRouter()
 router.register(r'utilisateurs', UtilisateurViewSet)
@@ -27,10 +28,11 @@ router.register(r'oeuvres', OeuvreViewSet)
 router.register(r'galeries', GalerieViewSet)
 router.register(r'interactions', InteractionViewSet)
 router.register(r'statistiques', StatistiqueViewSet)
-
+router.register(r'demandes', DemandeRoleViewSet)  # ← AJOUTE ÇA
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/', include(router.urls)),
+
 ]
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

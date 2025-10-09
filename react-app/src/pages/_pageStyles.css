@@ -230,3 +230,129 @@
   color: white;
   border-color: #3498db;
 }
+
+/* Layout fixes for profile card: center and limit width so it matches template visuals */
+
+.hero-style1.auth-form-wrapper {
+  display: block;
+  padding: 10px 0;
+}
+
+.hero-style1.auth-form-wrapper .card {
+  width: 100%;
+  margin: 0 auto;
+  border-radius: 14px;
+}
+
+/* Make sure the section spacing keeps the card centered on small screens */
+@media (max-width: 767.98px) {
+  .hero-style1.auth-form-wrapper .card {
+    max-width: 100%;
+    box-shadow: none;
+    border-radius: 10px;
+  }
+  .auth-container {
+    padding: 30px 12px;
+  }
+}
+
+/* Ensure the page has visible side gutters and a maximum content width */
+.space {
+  padding-left: 24px;
+  padding-right: 24px;
+}
+
+.space .container {
+  max-width: 1120px; /* keep content centered and avoid full-bleed */
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.hero-style1.auth-form-wrapper {
+  padding-left: 18px;
+  padding-right: 18px;
+  box-sizing: border-box;
+}
+
+@media (min-width: 1200px) {
+  .hero-style1.auth-form-wrapper .card {
+    max-width: none;
+  }
+}
+
+/* Login hero: ensure full-width card inside container-fluid with gutters */
+.hero-wrapper.auth-hero {
+  padding: 40px 0;
+}
+
+.hero-wrapper.auth-hero .hero-style1.auth-form-wrapper {
+  max-width: 1100px;
+  margin: 0 auto;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.08);
+}
+
+/* Ensure register/login forms are centered with a comfortable max-width inside container-fluid */
+.hero-style1.auth-form-wrapper {
+  max-width: 900px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Utility class to force a full-width card inside container-fluid while keeping padding/gutters */
+.hero-style1.auth-form-wrapper.full-width {
+  max-width: none;
+  padding-left: 32px;
+  padding-right: 32px;
+}
+
+/* full-bleed variant for internal pages: use container-fluid background but content with gutters */
+.hero-style1.auth-form-wrapper.full-bleed {
+  max-width: none;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.profile-section {
+  background: transparent;
+  padding: 8px 0 8px 0;
+  box-shadow: none;
+  text-align: left;
+}
+
+.profile-section .profile-info p {
+  margin: 6px 0;
+  color: var(--body-color, #7B7E86);
+}
+
+/* small inline spinner used in buttons */
+.spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: rgba(255,255,255,0.95);
+  border-radius: 50%;
+  margin-right: 8px;
+  vertical-align: -2px;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 767.98px) {
+  .hero-style1.auth-form-wrapper {
+    padding: 28px 16px;
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 767.98px) {
+  .hero-wrapper.auth-hero .hero-style1.auth-form-wrapper {
+    padding: 30px 18px;
+    border-radius: 10px;
+  }
+}
+
+

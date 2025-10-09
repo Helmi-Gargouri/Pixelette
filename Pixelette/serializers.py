@@ -1,39 +1,49 @@
 from rest_framework import serializers
-from .models import Utilisateur, Oeuvre, Galerie, Interaction, Statistique
+from .models import Utilisateur, Oeuvre, Galerie, Interaction, Statistique, DemandeRole
 from django.contrib.auth.hashers import make_password  
+import pyotp
 
 class UtilisateurSerializer(serializers.ModelSerializer):
-    password_confirm = serializers.CharField(write_only=True, required=False)  # ← Changé : non requis pour PATCH
+    password_confirm = serializers.CharField(write_only=True, required=False)
+    two_factor_enabled = serializers.BooleanField(source='is_two_factor_enabled', read_only=True)
 
     class Meta:
         model = Utilisateur
-        fields = ['id', 'nom', 'prenom', 'email', 'telephone', 'image', 'date_inscription', 'password', 'password_confirm']
+        fields = ['id', 'nom', 'prenom', 'email', 'telephone', 'image', 'date_inscription', 'password', 'password_confirm', 'two_factor_enabled', 'two_factor_secret', 'role']
         extra_kwargs = {
             'password': {'write_only': True},
             'password_confirm': {'write_only': True},
             'image': {'required': False},
+            'two_factor_secret': {'read_only': True},
+            'date_inscription': {'read_only': True},
+            'role': {'read_only': True},
         }
 
     def validate(self, data):
-        # ← Amélioré : check seulement si password présent (pour create ou update avec mdp)
         if 'password' in data:
             if 'password_confirm' not in data or data['password'] != data['password_confirm']:
                 raise serializers.ValidationError({"password": "Les mots de passe ne correspondent pas ou confirmation manquante."})
         return data
 
     def create(self, validated_data):
-        validated_data.pop('password_confirm', None)  # ← Safe pop (au cas où)
+        validated_data.pop('password_confirm', None)
         password = validated_data.pop('password')
         validated_data['password'] = make_password(password)
-        return super().create(validated_data)
-
+        validated_data['role'] = 'user'
+        # 2FA activé par défaut + temp_secret pour setup
+        #validated_data['is_two_factor_enabled'] = True
+        #validated_data['two_factor_temp_secret'] = pyotp.random_base32()  
+        #validated_data['two_factor_secret'] = None  # Pas encore configuré
+        validated_data.pop('two_factor_enabled', None)
+        return super().create(validated_data) 
+    
     def update(self, instance, validated_data):
-        # ← Nouveau : gère password si présent (hash), et pop confirm
-        validated_data.pop('password_confirm', None)  # Safe, même si absent
+        validated_data.pop('password_confirm', None)
         if 'password' in validated_data:
             password = validated_data.pop('password')
             validated_data['password'] = make_password(password)
-        return super().update(instance, validated_data)  # Gère image/nom/etc. normalement
+        validated_data.pop('two_factor_enabled', None)
+        return super().update(instance, validated_data)
 
 class OeuvreSerializer(serializers.ModelSerializer):
     class Meta:
@@ -54,3 +64,26 @@ class StatistiqueSerializer(serializers.ModelSerializer):
     class Meta:
         model = Statistique
         fields = '__all__'
+
+class DemandeRoleSerializer(serializers.ModelSerializer):
+    utilisateur_nom = serializers.SerializerMethodField()  
+
+    class Meta:
+        model = DemandeRole
+        fields = ['id', 'utilisateur_nom', 'nouveau_role', 'statut', 'raison', 'date_demande']
+        read_only_fields = ['id', 'utilisateur', 'statut', 'date_demande']
+
+    def get_utilisateur_nom(self, obj):
+        return f"{obj.utilisateur.prenom} {obj.utilisateur.nom}"
+    
+class ResetPasswordSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    reset_code = serializers.CharField(max_length=5, required=False)  
+    new_password = serializers.CharField(min_length=8, required=False)  
+    password_confirm = serializers.CharField(required=False)
+
+    def validate(self, data):
+        if 'new_password' in data and 'password_confirm' in data:
+            if data['new_password'] != data['password_confirm']:
+                raise serializers.ValidationError({"password": "Les mots de passe ne correspondent pas."})
+        return data
