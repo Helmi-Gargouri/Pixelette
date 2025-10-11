@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Utilisateur, Oeuvre, Galerie, Interaction, Statistique, DemandeRole
+from .models import Utilisateur, Oeuvre, Galerie, Interaction, Statistique, DemandeRole, GalerieInvitation
 from django.contrib.auth.hashers import make_password  
 import pyotp
 
@@ -44,16 +44,56 @@ class UtilisateurSerializer(serializers.ModelSerializer):
             validated_data['password'] = make_password(password)
         validated_data.pop('two_factor_enabled', None)
         return super().update(instance, validated_data)
+    
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        if instance.image:
+            request = self.context.get('request')
+            if request:
+                representation['image'] = request.build_absolute_uri(instance.image.url)
+            else:
+                representation['image'] = instance.image.url
+        return representation
 
 class OeuvreSerializer(serializers.ModelSerializer):
     class Meta:
         model = Oeuvre
         fields = '__all__'
+        
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        if instance.image:
+            request = self.context.get('request')
+            if request:
+                representation['image'] = request.build_absolute_uri(instance.image.url)
+            else:
+                representation['image'] = instance.image.url
+        return representation
 
 class GalerieSerializer(serializers.ModelSerializer):
+    oeuvres_count = serializers.SerializerMethodField()
+    oeuvres_list = OeuvreSerializer(source='oeuvres', many=True, read_only=True)
+    
     class Meta:
         model = Galerie
-        fields = '__all__'
+        fields = ['id', 'nom', 'description', 'theme', 'proprietaire', 'privee', 'oeuvres', 'oeuvres_count', 'oeuvres_list', 'date_creation']
+    
+    def get_oeuvres_count(self, obj):
+        return obj.oeuvres.count()
+
+class GalerieInvitationSerializer(serializers.ModelSerializer):
+    utilisateur_email = serializers.EmailField(source='utilisateur.email', read_only=True)
+    utilisateur_nom = serializers.SerializerMethodField()
+    galerie_nom = serializers.CharField(source='galerie.nom', read_only=True)
+    
+    class Meta:
+        model = GalerieInvitation
+        fields = ['id', 'galerie', 'galerie_nom', 'utilisateur', 'utilisateur_email', 'utilisateur_nom', 
+                  'token', 'date_envoi', 'date_expiration', 'acceptee', 'date_acceptation']
+        read_only_fields = ['token', 'date_envoi', 'date_expiration', 'acceptee', 'date_acceptation']
+    
+    def get_utilisateur_nom(self, obj):
+        return f"{obj.utilisateur.prenom} {obj.utilisateur.nom}"
 
 class InteractionSerializer(serializers.ModelSerializer):
     class Meta:

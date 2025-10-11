@@ -1,5 +1,8 @@
 from django.db import models
 import pyotp
+import uuid
+from datetime import timedelta
+from django.utils import timezone
 from django.core.mail import send_mail 
 
 class Utilisateur(models.Model): 
@@ -55,12 +58,41 @@ class Oeuvre(models.Model):
 class Galerie(models.Model):
     nom = models.CharField(max_length=150, verbose_name="Nom de la galerie")
     description = models.TextField(verbose_name="Description", blank=True)
+    theme = models.CharField(max_length=100, verbose_name="Thème", blank=True, null=True)
     proprietaire = models.ForeignKey(Utilisateur, on_delete=models.CASCADE, related_name="galeries", verbose_name="Propriétaire")
     privee = models.BooleanField(default=False, verbose_name="Privée")
+    oeuvres = models.ManyToManyField(Oeuvre, related_name="galeries_associees", blank=True, verbose_name="Oeuvres")
     date_creation = models.DateTimeField(auto_now_add=True, verbose_name="Date de création")
 
     def __str__(self):
         return self.nom
+
+class GalerieInvitation(models.Model):
+    galerie = models.ForeignKey(Galerie, on_delete=models.CASCADE, related_name='invitations', verbose_name="Galerie")
+    utilisateur = models.ForeignKey(Utilisateur, on_delete=models.CASCADE, related_name='galerie_invitations', verbose_name="Utilisateur invité")
+    token = models.UUIDField(default=uuid.uuid4, unique=True, editable=False, verbose_name="Token d'invitation")
+    date_envoi = models.DateTimeField(auto_now_add=True, verbose_name="Date d'envoi")
+    date_expiration = models.DateTimeField(verbose_name="Date d'expiration")
+    acceptee = models.BooleanField(default=False, verbose_name="Acceptée")
+    date_acceptation = models.DateTimeField(null=True, blank=True, verbose_name="Date d'acceptation")
+    
+    class Meta:
+        unique_together = ['galerie', 'utilisateur']
+        verbose_name = "Invitation à une galerie"
+        verbose_name_plural = "Invitations aux galeries"
+    
+    def save(self, *args, **kwargs):
+        if not self.date_expiration:
+            # L'invitation expire dans 30 jours
+            self.date_expiration = timezone.now() + timedelta(days=30)
+        super().save(*args, **kwargs)
+    
+    def is_valid(self):
+        """Vérifie si l'invitation est toujours valide"""
+        return not self.acceptee and timezone.now() < self.date_expiration
+    
+    def __str__(self):
+        return f"Invitation pour {self.utilisateur.email} - Galerie: {self.galerie.nom}"
 
 class Interaction(models.Model):
     TYPE_CHOICES = [

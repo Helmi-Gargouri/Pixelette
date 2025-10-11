@@ -175,5 +175,8 @@ EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD')
 EMAIL_USE_TLS = config('EMAIL_USE_TLS', cast=bool)
 DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL')
 
+# URL du frontend pour les liens dans les emails
+FRONTEND_URL = config('FRONTEND_URL', default='http://localhost:5173')
+
 # Autoriser le frontend React à accéder à l'API Django pendant le développement
 #CORS_ALLOW_ALL_ORIGINS = True
