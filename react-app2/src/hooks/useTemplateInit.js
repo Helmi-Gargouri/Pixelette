@@ -35,11 +35,21 @@ const useTemplateInit = () => {
       }
     }
 
+    // Hide preloader once route changes / after small delay
+    const hidePreloader = () => {
+      const preloader = document.querySelector('.preloader')
+      if (preloader) {
+        preloader.classList.add('hidden') // optional fade-out if CSS supports it
+        setTimeout(() => preloader.remove(), 500) // remove from DOM after fade
+      }
+    }
+
     // Small delay to ensure DOM is ready
     const timer = setTimeout(() => {
       initBackgroundImages()
       initWowAnimations()
-    }, 100)
+      hidePreloader()
+    }, 500) // wait half a second
 
     return () => clearTimeout(timer)
   }, [location.pathname])
@@ -48,6 +58,3 @@ const useTemplateInit = () => {
 }
 
 export default useTemplateInit
-
-
-
