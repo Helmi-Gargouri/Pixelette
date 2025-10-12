@@ -1,3 +1,9 @@
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from .utils.color_analysis import analyze_galerie_palette
+from .utils.clustering import cluster_galeries
+from .utils.spotify import generate_playlist_for_gallery, search_playlists_by_theme, get_spotify_oauth, create_playlist_in_user_account
+from rest_framework.permissions import IsAuthenticatedOrReadOnly
 from rest_framework import viewsets
 from .models import Utilisateur, Oeuvre, Galerie, Interaction, Statistique, GalerieInvitation
 from .serializers import UtilisateurSerializer, OeuvreSerializer, GalerieSerializer, InteractionSerializer, StatistiqueSerializer, GalerieInvitationSerializer
@@ -19,7 +25,7 @@ from django.utils.encoding import force_bytes, force_str
 from django.contrib.auth.tokens import PasswordResetTokenGenerator
 from django.contrib.auth.hashers import make_password, check_password
 from io import BytesIO
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, permission_classes
 from qrcode.constants import ERROR_CORRECT_L
 from django.shortcuts import get_object_or_404
 from .models import DemandeRole 
@@ -37,6 +43,9 @@ import base64
 import qrcode
 import random
 import uuid
+import requests
+import io
+from PIL import Image
 
 class IsAdmin(permissions.BasePermission):
     def has_permission(self, request, view):
@@ -369,11 +378,199 @@ class OeuvreViewSet(viewsets.ModelViewSet):
     queryset = Oeuvre.objects.all()
     serializer_class = OeuvreSerializer
     permission_classes = [AllowAny]
+    
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
+    def generate_ai_image(self, request):
+        """Générer une image via IA en utilisant Hugging Face API"""
+        prompt = request.data.get('prompt')
+        style = request.data.get('style', '')
+        
+        if not prompt:
+            return Response({'error': 'Le prompt est requis'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Combiner le prompt avec le style
+        full_prompt = f"{prompt}, {style}" if style else prompt
+        
+        # Configuration de l'API Hugging Face
+        # Note: Vous devez obtenir un token gratuit sur https://huggingface.co/settings/tokens
+        api_token = getattr(settings, 'HUGGINGFACE_API_TOKEN', None)
+        
+        if not api_token:
+            # Utiliser une API gratuite alternative sans token (Pollinations.ai)
+            try:
+                # Pollinations.ai est une API gratuite sans clé requise
+                pollinations_url = f"https://image.pollinations.ai/prompt/{requests.utils.quote(full_prompt)}"
+                
+                response = requests.get(pollinations_url, timeout=60)
+                
+                if response.status_code == 200:
+                    # Sauvegarder l'image temporairement
+                    image = Image.open(io.BytesIO(response.content))
+                    
+                    # Convertir en base64 pour l'envoyer au frontend
+                    buffer = io.BytesIO()
+                    image.save(buffer, format='PNG')
+                    image_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
+                    
+                    return Response({
+                        'image': f"data:image/png;base64,{image_base64}",
+                        'prompt': full_prompt,
+                        'message': 'Image générée avec succès'
+                    })
+                else:
+                    return Response(
+                        {'error': 'Erreur lors de la génération de l\'image'},
+                        status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                    )
+            except Exception as e:
+                return Response(
+                    {'error': f'Erreur: {str(e)}'},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+        
+        # Si un token Hugging Face est disponible, utiliser Stable Diffusion
+        try:
+            API_URL = "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-2-1"
+            headers = {"Authorization": f"Bearer {api_token}"}
+            
+            payload = {
+                "inputs": full_prompt,
+                "parameters": {
+                    "negative_prompt": "blurry, bad quality, distorted",
+                    "num_inference_steps": 50
+                }
+            }
+            
+            response = requests.post(API_URL, headers=headers, json=payload, timeout=60)
+            
+            if response.status_code == 200:
+                image = Image.open(io.BytesIO(response.content))
+                
+                # Convertir en base64
+                buffer = io.BytesIO()
+                image.save(buffer, format='PNG')
+                image_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
+                
+                return Response({
+                    'image': f"data:image/png;base64,{image_base64}",
+                    'prompt': full_prompt,
+                    'message': 'Image générée avec succès'
+                })
+            else:
+                error_msg = response.json().get('error', 'Erreur inconnue')
+                return Response(
+                    {'error': f'Erreur API: {error_msg}'},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+                
+        except Exception as e:
+            return Response(
+                {'error': f'Erreur lors de la génération: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 class GalerieViewSet(viewsets.ModelViewSet):
     queryset = Galerie.objects.all()
     serializer_class = GalerieSerializer
     permission_classes = [AllowAny]
+    @action(detail=True, methods=['get'], permission_classes=[IsAuthenticated])
+    def palette(self, request, pk=None):
+        """
+        Analyse la palette de couleurs d'une galerie et suggère des harmonies.
+        Réservé au propriétaire ou admin.
+        """
+        try:
+            galerie = self.get_object()
+            
+            # Vérifie que l'utilisateur est le propriétaire ou admin
+            if request.user != galerie.proprietaire and request.user.role != 'admin':
+                return Response(
+                    {'error': 'Vous devez être le propriétaire pour analyser cette galerie'},
+                    status=403
+                )
+            
+            result = analyze_galerie_palette(pk)
+            return Response(result)
+        except Galerie.DoesNotExist:
+            return Response({'error': 'Galerie non trouvée'}, status=404)
+        except Exception as e:
+            return Response({'error': str(e)}, status=500)
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticatedOrReadOnly])
+    def clusters(self, request):
+        num_clusters = int(request.query_params.get('num_clusters', 5))
+        my_galleries = request.query_params.get('my', 'false').lower() == 'true'
+        user = request.user if my_galleries and request.user.is_authenticated else None
+        only_public = not my_galleries
+
+        if my_galleries and not request.user.is_authenticated:
+            return Response({'error': 'Authentication required for personal clusters'}, status=status.HTTP_401_UNAUTHORIZED)
+
+        clusters = cluster_galeries(num_clusters=num_clusters, only_public=only_public, user=user)
+
+        serialized_clusters = {}
+        for label, galeries_ids in clusters.items():
+            galeries_qs = Galerie.objects.filter(id__in=galeries_ids)
+            serialized_clusters[label] = GalerieSerializer(galeries_qs, many=True).data
+
+        return Response(serialized_clusters)
+    
+    @action(detail=True, methods=['get'], permission_classes=[AllowAny])
+    def generate_spotify_playlist(self, request, pk=None):
+        """
+        Génère une playlist Spotify basée sur le thème de la galerie.
+        """
+        try:
+            galerie = self.get_object()
+            
+            # Génère la playlist
+            result = generate_playlist_for_gallery(
+                galerie_nom=galerie.nom,
+                galerie_theme=galerie.theme or 'Art',
+                galerie_description=galerie.description or ''
+            )
+            
+            if result['success']:
+                return Response(result, status=status.HTTP_200_OK)
+            else:
+                return Response(
+                    {'error': result.get('message', 'Erreur lors de la génération de la playlist')},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+                
+        except Galerie.DoesNotExist:
+            return Response({'error': 'Galerie non trouvée'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response(
+                {'error': f'Erreur: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    @action(detail=True, methods=['get'], permission_classes=[AllowAny])
+    def search_spotify_playlists(self, request, pk=None):
+        """
+        Recherche des playlists Spotify existantes basées sur le thème de la galerie.
+        """
+        try:
+            galerie = self.get_object()
+            theme = galerie.theme or galerie.nom
+            
+            result = search_playlists_by_theme(theme, limit=10)
+            
+            if result['success']:
+                return Response(result, status=status.HTTP_200_OK)
+            else:
+                return Response(
+                    {'error': result.get('message', 'Erreur lors de la recherche')},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+                
+        except Galerie.DoesNotExist:
+            return Response({'error': 'Galerie non trouvée'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response(
+                {'error': f'Erreur: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
     
     def retrieve(self, request, *args, **kwargs):
         galerie = self.get_object()
@@ -661,3 +858,113 @@ class DemandeRoleViewSet(viewsets.ModelViewSet):
         # ← FIX : Même chose pour rejeter
         nom_utilisateur = f"{demande.utilisateur.prenom} {demande.utilisateur.nom}"
         return Response({'message': f'Demande rejetée pour {nom_utilisateur}.'})
+
+
+# ===== VUES SPOTIFY OAUTH =====
+
+from django.http import JsonResponse, HttpResponseRedirect
+from django.views.decorators.csrf import csrf_exempt
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def spotify_create_playlist(request):
+    """
+    Crée une playlist dans le compte Spotify de l'utilisateur.
+    Nécessite access_token, galerie_id, et track_uris.
+    """
+    try:
+        access_token = request.data.get('access_token')
+        galerie_id = request.data.get('galerie_id')
+        track_uris = request.data.get('track_uris', [])
+        
+        if not access_token:
+            return Response({'error': 'Access token manquant'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Récupère la galerie
+        galerie = Galerie.objects.get(id=galerie_id)
+        
+        # Récupère l'user ID Spotify depuis le token
+        import spotipy
+        sp = spotipy.Spotify(auth=access_token)
+        spotify_user = sp.current_user()
+        
+        # Crée la playlist
+        result = create_playlist_in_user_account(
+            access_token=access_token,
+            user_id=spotify_user['id'],
+            playlist_name=f"🎨 {galerie.nom}",
+            track_uris=track_uris,
+            description=f"Playlist générée pour la galerie '{galerie.nom}' - {galerie.theme or 'Art'}"
+        )
+        
+        if result['success']:
+            return Response(result, status=status.HTTP_200_OK)
+        else:
+            return Response({'error': result['error']}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+    except Galerie.DoesNotExist:
+        return Response({'error': 'Galerie non trouvée'}, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        print(f"❌ Erreur création playlist: {str(e)}")
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def spotify_auth_url(request):
+    """
+    Retourne l'URL d'autorisation Spotify OAuth.
+    """
+    try:
+        galerie_id = request.GET.get('galerie_id')
+        
+        # Stocke l'ID dans la session ET dans le state OAuth
+        request.session['spotify_galerie_id'] = galerie_id
+        request.session.save()  # Force la sauvegarde de la session
+        
+        sp_oauth = get_spotify_oauth()
+        # Utilise le paramètre state pour passer l'ID de la galerie
+        auth_url = sp_oauth.get_authorize_url(state=galerie_id)
+        
+        return Response({'auth_url': auth_url}, status=status.HTTP_200_OK)
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def spotify_callback(request):
+    """
+    Callback après l'autorisation Spotify OAuth.
+    """
+    try:
+        code = request.GET.get('code')
+        state = request.GET.get('state')  # Récupère l'ID de la galerie depuis le state
+        
+        if not code:
+            return HttpResponseRedirect(f"{settings.FRONTEND_URL}/galeries?error=spotify_auth_failed")
+        
+        sp_oauth = get_spotify_oauth()
+        token_info = sp_oauth.get_access_token(code)
+        
+        if not token_info:
+            return HttpResponseRedirect(f"{settings.FRONTEND_URL}/galeries?error=spotify_token_failed")
+        
+        # Récupère l'ID de la galerie depuis le state OAuth (prioritaire) ou la session
+        galerie_id = state or request.session.get('spotify_galerie_id')
+        
+        if not galerie_id:
+            return HttpResponseRedirect(f"{settings.FRONTEND_URL}/galeries?error=galerie_id_missing")
+        
+        # Redirige vers le frontend avec le token
+        redirect_url = f"{settings.FRONTEND_URL}/galeries/{galerie_id}?spotify_token={token_info['access_token']}"
+        
+        print(f"✅ Redirection vers: {redirect_url}")
+        
+        return HttpResponseRedirect(redirect_url)
+        
+    except Exception as e:
+        print(f"❌ Erreur callback Spotify: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return HttpResponseRedirect(f"{settings.FRONTEND_URL}/galeries?error=spotify_callback_failed")

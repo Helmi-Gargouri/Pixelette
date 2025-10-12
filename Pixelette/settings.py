@@ -182,3 +182,8 @@ FRONTEND_URL = config('FRONTEND_URL', default='http://localhost:5173')
 
 # Autoriser le frontend React à accéder à l'API Django pendant le développement
 #CORS_ALLOW_ALL_ORIGINS = True
+
+# Spotify API Configuration
+SPOTIFY_CLIENT_ID = config('SPOTIFY_CLIENT_ID', default='')
+SPOTIFY_CLIENT_SECRET = config('SPOTIFY_CLIENT_SECRET', default='')
+SPOTIFY_REDIRECT_URI = config('SPOTIFY_REDIRECT_URI', default='http://127.0.0.1:8000/api/spotify/callback/')

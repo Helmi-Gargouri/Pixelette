@@ -10,12 +10,13 @@ import avatar1 from '@/assets/images/user/avatar-1.png';
 import avatar3 from '@/assets/images/user/avatar-3.png';
 import avatar5 from '@/assets/images/user/avatar-5.png';
 import avatar7 from '@/assets/images/user/avatar-7.png';
-import { Link } from 'react-router';
+import { Link, useNavigate } from 'react-router-dom';
 import { TbSearch } from 'react-icons/tb';
 import SimpleBar from 'simplebar-react';
 import SidenavToggle from './SidenavToggle';
 import ThemeModeToggle from './ThemeModeToggle';
 import { LuBellRing, LuClock, LuGem, LuHeart, LuLogOut, LuMail, LuMessagesSquare, LuMoveRight, LuSettings, LuShoppingBag } from 'react-icons/lu';
+import { useAuth } from '@/context/AuthContext';
 const languages = [{
   src: UsFlag,
   label: 'English'
@@ -131,27 +132,31 @@ const notifications = {
     ago: 'yesterday'
   }]
 };
-const profileMenu = [{
-  icon: <LuMail className="size-4" />,
-  label: 'Inbox',
-  to: '/mailbox',
-  badge: '15'
-}, {
-  icon: <LuMessagesSquare className="size-4" />,
-  label: 'Chat',
-  to: '/chat'
-}, {
-  icon: <LuGem className="size-4" />,
-  label: 'Upgrade Pro',
-  to: '/pricing'
-}, {
-  divider: true
-}, {
-  icon: <LuLogOut className="size-4" />,
-  label: 'Sign Out',
-  to: '/basic-logout'
-}];
 const Topbar = () => {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    await logout();
+    navigate('/admin-login');
+  };
+
+  const profileMenu = [{
+    icon: <LuMail className="size-4" />,
+    label: 'Inbox',
+    to: '/mailbox',
+    badge: '15'
+  }, {
+    icon: <LuMessagesSquare className="size-4" />,
+    label: 'Chat',
+    to: '/chat'
+  }, {
+    divider: true
+  }, {
+    icon: <LuLogOut className="size-4" />,
+    label: 'Déconnexion',
+    action: handleLogout
+  }];
   return <div className="app-header min-h-topbar-height flex items-center sticky top-0 z-30 bg-(--topbar-background) border-b border-default-200">
       <div className="w-full flex items-center justify-between px-6">
         <div className="flex items-center gap-5">
@@ -257,29 +262,56 @@ const Topbar = () => {
             </button>
             <div className="hs-dropdown-menu min-w-48">
               <div className="p-2">
-                <h6 className="mb-2 text-default-500">Welcome to Tailwick</h6>
-                <Link to="#!" className="flex gap-3">
+                <h6 className="mb-2 text-default-500">Backoffice Pixelette</h6>
+                <div className="flex gap-3">
                   <div className="relative inline-block">
-                    <img src={avatar1} alt="user" className="size-12 rounded" />
+                    {user?.image ? (
+                      <img src={user.image} alt={user.nom} className="size-12 rounded" />
+                    ) : (
+                      <div className="size-12 rounded bg-primary/10 flex items-center justify-center text-primary font-bold">
+                        {user?.prenom?.[0]}{user?.nom?.[0]}
+                      </div>
+                    )}
                     <span className="-top-1 -end-1 absolute w-2.5 h-2.5 bg-green-400 border-2 border-white rounded-full"></span>
                   </div>
                   <div>
-                    <h6 className="mb-1 text-sm font-semibold text-default-800">Paula Keenan</h6>
-                    <p className="text-default-500">CEO & Founder</p>
+                    <h6 className="mb-1 text-sm font-semibold text-default-800">
+                      {user?.prenom} {user?.nom}
+                    </h6>
+                    <p className="text-default-500">Administrateur</p>
                   </div>
-                </Link>
+                </div>
               </div>
 
               <div className="border-t border-default-200 -mx-2 my-2"></div>
 
               <div className="flex flex-col gap-y-1">
-                {profileMenu.map((item, i) => item.divider ? <div key={i} className="border-t border-default-200 -mx-2 my-1"></div> : <Link key={i} to={item.to || '#!'} className="flex items-center gap-x-3.5 py-1.5 px-3 text-default-600 hover:bg-default-150 rounded font-medium">
-                      {item.icon}
-                      {item.label}
-                      {item.badge && <span className="size-4.5 font-semibold bg-danger rounded text-white flex items-center justify-center text-xs">
-                          {item.badge}
-                        </span>}
-                    </Link>)}
+                {profileMenu.map((item, i) => item.divider ? (
+                  <div key={i} className="border-t border-default-200 -mx-2 my-1"></div>
+                ) : item.action ? (
+                  <button 
+                    key={i} 
+                    onClick={item.action}
+                    className="flex items-center gap-x-3.5 py-1.5 px-3 text-default-600 hover:bg-default-150 rounded font-medium w-full text-left"
+                  >
+                    {item.icon}
+                    {item.label}
+                  </button>
+                ) : (
+                  <Link 
+                    key={i} 
+                    to={item.to || '#!'} 
+                    className="flex items-center gap-x-3.5 py-1.5 px-3 text-default-600 hover:bg-default-150 rounded font-medium"
+                  >
+                    {item.icon}
+                    {item.label}
+                    {item.badge && (
+                      <span className="size-4.5 font-semibold bg-danger rounded text-white flex items-center justify-center text-xs">
+                        {item.badge}
+                      </span>
+                    )}
+                  </Link>
+                ))}
               </div>
             </div>
           </div>

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import { useAuth } from '../../context/AuthContext'
@@ -16,6 +16,37 @@ const GalerieCreate = () => {
   })
   const [errors, setErrors] = useState({})
   const [modal, setModal] = useState({ show: false, title: '', message: '', type: 'success' })
+  const [allOeuvres, setAllOeuvres] = useState([])
+  const [selectedOeuvres, setSelectedOeuvres] = useState([])
+
+  useEffect(() => {
+    fetchAllOeuvres()
+  }, [])
+
+  const fetchAllOeuvres = async () => {
+    try {
+      const token = localStorage.getItem('token')
+      const response = await axios.get('http://localhost:8000/api/oeuvres/', {
+        withCredentials: true,
+        headers: {
+          Authorization: `Token ${token}`
+        }
+      })
+      setAllOeuvres(response.data)
+    } catch (error) {
+      console.error('Erreur lors du chargement des œuvres:', error)
+    }
+  }
+
+  const toggleOeuvre = (oeuvreId) => {
+    setSelectedOeuvres(prev => {
+      if (prev.includes(oeuvreId)) {
+        return prev.filter(id => id !== oeuvreId)
+      } else {
+        return [...prev, oeuvreId]
+      }
+    })
+  }
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target
@@ -57,7 +88,8 @@ const GalerieCreate = () => {
       await axios.post('http://localhost:8000/api/galeries/', 
         {
           ...formData,
-          proprietaire: user.id
+          proprietaire: user.id,
+          oeuvres: selectedOeuvres
         },
         {
           withCredentials: true,
@@ -203,6 +235,121 @@ const GalerieCreate = () => {
                           Galerie privée (uniquement visible par vous)
                         </label>
                       </div>
+                    </div>
+
+                    <div className="col-12 form-group">
+                      <label className="form-label">
+                        <i className="fas fa-images me-2"></i>
+                        Sélectionner les œuvres à inclure
+                        {selectedOeuvres.length > 0 && (
+                          <span className="text-muted ms-2">({selectedOeuvres.length})</span>
+                        )}
+                      </label>
+                      
+                      {allOeuvres.length === 0 ? (
+                        <div className="alert alert-info">
+                          <i className="fas fa-info-circle me-2"></i>
+                          Aucune œuvre disponible. Créez d'abord des œuvres pour les ajouter à votre galerie.
+                        </div>
+                      ) : (
+                        <div style={{ 
+                          display: 'grid', 
+                          gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', 
+                          gap: '20px',
+                          maxHeight: '450px',
+                          overflowY: 'auto',
+                          padding: '20px',
+                          border: '1px solid #e0e0e0',
+                          borderRadius: '10px',
+                          background: '#f9f9f9'
+                        }}>
+                          {allOeuvres.map(oeuvre => (
+                            <div 
+                              key={oeuvre.id}
+                              onClick={() => toggleOeuvre(oeuvre.id)}
+                              style={{ 
+                                position: 'relative',
+                                cursor: 'pointer',
+                                borderRadius: '12px',
+                                overflow: 'hidden',
+                                border: selectedOeuvres.includes(oeuvre.id) ? '3px solid var(--theme-color)' : '2px solid #ddd',
+                                transition: 'all 0.3s ease',
+                                boxShadow: selectedOeuvres.includes(oeuvre.id) ? '0 6px 20px rgba(0,0,0,0.15)' : '0 2px 8px rgba(0,0,0,0.08)',
+                                transform: selectedOeuvres.includes(oeuvre.id) ? 'scale(1.02)' : 'scale(1)',
+                                background: '#fff'
+                              }}
+                            >
+                              {oeuvre.image ? (
+                                <img 
+                                  src={oeuvre.image.startsWith('http') ? oeuvre.image : `http://localhost:8000${oeuvre.image}`}
+                                  alt={oeuvre.titre}
+                                  style={{ 
+                                    width: '100%', 
+                                    height: '140px', 
+                                    objectFit: 'cover',
+                                    display: 'block'
+                                  }}
+                                  onError={(e) => {
+                                    e.target.style.display = 'none';
+                                    e.target.nextElementSibling.style.display = 'flex';
+                                  }}
+                                />
+                              ) : null}
+                              <div style={{ 
+                                width: '100%', 
+                                height: '140px', 
+                                background: '#e9ecef',
+                                display: oeuvre.image ? 'none' : 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                              }}>
+                                <i className="fas fa-image" style={{ fontSize: '2.5rem', color: '#adb5bd' }}></i>
+                              </div>
+                              
+                              {selectedOeuvres.includes(oeuvre.id) && (
+                                <div style={{
+                                  position: 'absolute',
+                                  top: '8px',
+                                  right: '8px',
+                                  background: 'var(--theme-color)',
+                                  color: 'white',
+                                  borderRadius: '50%',
+                                  width: '32px',
+                                  height: '32px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  boxShadow: '0 2px 8px rgba(0,0,0,0.3)'
+                                }}>
+                                  <i className="fas fa-check" style={{ fontSize: '0.9rem' }}></i>
+                                </div>
+                              )}
+                              
+                              <div style={{
+                                position: 'absolute',
+                                bottom: 0,
+                                left: 0,
+                                right: 0,
+                                background: 'linear-gradient(to top, rgba(0,0,0,0.85), rgba(0,0,0,0.4) 60%, transparent)',
+                                padding: '15px 10px 8px',
+                                color: 'white'
+                              }}>
+                                <p style={{ 
+                                  margin: 0, 
+                                  fontSize: '0.9rem',
+                                  fontWeight: '600',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap',
+                                  textShadow: '0 1px 3px rgba(0,0,0,0.5)'
+                                }}>
+                                  {oeuvre.titre}
+                                </p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
 
                     <div className="col-12 form-group d-flex gap-2 align-items-center">

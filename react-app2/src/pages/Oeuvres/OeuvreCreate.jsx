@@ -241,7 +241,11 @@ const OeuvreCreate = () => {
                         )}
                       </button>
                       
-                      <Link to="/mes-oeuvres" className="btn btn-sm btn-outline-secondary">
+                      <Link to="/mes-oeuvres" style={{ 
+                              backgroundColor: '#6c757d',
+                              borderColor: '#6c757d',
+                              color: '#fff'
+                            }} className="btn btn-sm btn-outline-secondary">
                         Annuler
                       </Link>
                     </div>

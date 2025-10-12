@@ -169,7 +169,7 @@ const MesOeuvres = () => {
           {/* Barre de recherche et filtres */}
           <div style={{ background: '#F8F7F4', padding: '25px', borderRadius: '15px', marginBottom: '30px' }}>
             <div className="row align-items-center">
-              <div className="col-lg-7 col-md-12 mb-3 mb-lg-0">
+              <div className="col-lg-5 col-md-12 mb-3 mb-lg-0">
                 <div className="input-group" style={{ boxShadow: '0 2px 10px rgba(0,0,0,0.05)' }}>
                   <span className="input-group-text" style={{ 
                     background: '#fff', 
@@ -228,9 +228,18 @@ const MesOeuvres = () => {
                   <option value="title"> Titre (A-Z)</option>
                 </select>
               </div>
-              <div className="col-lg-2 col-md-4">
+              <div className="col-lg-2 col-md-6 mb-3 mb-lg-0">
                 <Link to="/oeuvres/create" className="btn w-100" style={{ padding: '12px' }}>
                   <i className="fas fa-plus me-2"></i>Nouvelle oeuvre
+                </Link>
+              </div>
+              <div className="col-lg-2 col-md-6">
+                <Link to="/oeuvres/ai-generator" className="btn w-100" style={{ 
+                  padding: '12px',
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  border: 'none'
+                }}>
+                  <i className="fas fa-magic me-2"></i>Générer IA
                 </Link>
               </div>
             </div>
@@ -262,10 +271,19 @@ const MesOeuvres = () => {
               <h3>{searchTerm ? 'Aucun résultat trouvé' : 'Aucune oeuvre disponible'}</h3>
               <p>{searchTerm ? 'Essayez avec d\'autres mots-clés' : 'Commencez par créer votre première oeuvre !'}</p>
               {!searchTerm && (
-                <Link to="/oeuvres/create" className="btn mt-3">
-                  <i className="fas fa-plus me-2"></i>
-                  Créer ma première oeuvre
-                </Link>
+                <div className="d-flex gap-2 justify-content-center mt-3">
+                  <Link to="/oeuvres/create" className="btn">
+                    <i className="fas fa-plus me-2"></i>
+                    Créer ma première oeuvre
+                  </Link>
+                  <Link to="/oeuvres/ai-generator" className="btn" style={{ 
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    border: 'none'
+                  }}>
+                    <i className="fas fa-magic me-2"></i>
+                    Générer avec l'IA
+                  </Link>
+                </div>
               )}
             </div>
           ) : (

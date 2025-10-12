@@ -18,6 +18,29 @@ const Login = () => {
         { email, password },
         { withCredentials: true }
       );
+      
+      const userData = response.data.user;
+      
+      // Si l'utilisateur est admin, rediriger vers le backoffice
+      if (userData && userData.role === 'admin') {
+        // Stocke les données pour le backoffice
+        window.sessionStorage.setItem('admin_user_data', JSON.stringify(userData));
+        
+        setModal({ 
+          show: true, 
+          title: 'Redirection...', 
+          message: 'Connexion admin réussie ! Redirection vers le backoffice...', 
+          type: 'success' 
+        });
+        
+        // Redirige vers le backoffice sur le port 5174
+        setTimeout(() => {
+          window.location.href = 'http://localhost:5174';
+        }, 1500);
+        return;
+      }
+      
+      // Pour les utilisateurs normaux
       if (response.data.token) {
         login(response.data.user, response.data.token);
         setModal({ 

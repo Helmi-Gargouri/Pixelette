@@ -40,6 +40,14 @@ const InvoiceOverview = lazy(() => import('@/app/(admin)/(app)/(invoice)/overvie
 
 const UserGrid = lazy(() => import('@/app/(admin)/(app)/(users)/users-grid'));
 const UserList = lazy(() => import('@/app/(admin)/(app)/(users)/users-list'));
+
+// Pixelette - Œuvres et Galeries
+const OeuvreGrid = lazy(() => import('@/app/(admin)/(app)/oeuvres-grid'));
+const GalerieList = lazy(() => import('@/app/(admin)/(app)/galeries-list'));
+
+// Admin Auth
+const AdminLogin = lazy(() => import('@/app/(auth)/admin-login'));
+
 const Calender = lazy(() => import('@/app/(admin)/(app)/calendar'));
 const Chat = lazy(() => import('@/app/(admin)/(app)/chat'));
 const MailBox = lazy(() => import('@/app/(admin)/(app)/mailbox'));
@@ -234,6 +242,14 @@ export const layoutsRoutes = [{
   name: 'UserList',
   element: <UserList />
 }, {
+  path: '/oeuvres-grid',
+  name: 'OeuvreGrid',
+  element: <OeuvreGrid />
+}, {
+  path: '/galeries-list',
+  name: 'GalerieList',
+  element: <GalerieList />
+}, {
   path: '/calendar',
   name: 'Calender',
   element: <Calender />
@@ -319,6 +335,10 @@ export const layoutsRoutes = [{
   element: <Timeline />
 }];
 export const singlePageRoutes = [{
+  path: '/admin-login',
+  name: 'AdminLogin',
+  element: <AdminLogin />
+}, {
   path: '/basic-login',
   name: 'BasicLogin',
   element: <BasicLogin />

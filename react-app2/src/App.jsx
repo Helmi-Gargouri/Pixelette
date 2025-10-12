@@ -31,6 +31,7 @@ import OeuvreCreate from './pages/Oeuvres/OeuvreCreate';
 import OeuvreEdit from './pages/Oeuvres/OeuvreEdit';
 import OeuvreDetails from './pages/Oeuvres/OeuvreDetails';
 import MesOeuvres from './pages/Oeuvres/MesOeuvres';
+import OeuvreAIGenerator from './pages/Oeuvres/OeuvreAIGenerator';
 import GaleriesList from './pages/Galeries/GaleriesList';
 import GalerieCreate from './pages/Galeries/GalerieCreate';
 import GalerieEdit from './pages/Galeries/GalerieEdit';
@@ -114,6 +115,7 @@ function App() {
             
             {/* Routes Oeuvres */}
             <Route path="/oeuvres/create" element={<OeuvreCreate />} />
+            <Route path="/oeuvres/ai-generator" element={<OeuvreAIGenerator />} />
             <Route path="/oeuvres/:id/edit" element={<OeuvreEdit />} />
             <Route path="/mes-oeuvres" element={<MesOeuvres />} />
 

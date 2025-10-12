@@ -6,6 +6,8 @@ import Modal from '../../components/Modal'
 import ConfirmModal from '../../components/ConfirmModal'
 import OeuvreModal from '../../components/OeuvreModal'
 import InviteModal from '../../components/InviteModal'
+import SpotifyModal from '../../components/SpotifyModal'
+import ColorPaletteModal from '../../components/ColorPaletteModal'
 
 const GalerieDetails = () => {
   const { id } = useParams()
@@ -19,6 +21,8 @@ const GalerieDetails = () => {
   const [confirmModal, setConfirmModal] = useState(false)
   const [oeuvreModal, setOeuvreModal] = useState({ show: false, oeuvre: null })
   const [inviteModal, setInviteModal] = useState(false)
+  const [spotifyModal, setSpotifyModal] = useState({ show: false, playlist: null, loading: false })
+  const [paletteModal, setPaletteModal] = useState({ show: false, data: null, loading: false })
 
   useEffect(() => {
     fetchGalerie()
@@ -80,9 +84,152 @@ const GalerieDetails = () => {
 
   const handleModalClose = () => {
     setModal({ ...modal, show: false })
-    if (modal.type === 'success') {
-      // Rediriger vers mes-galeries si l'utilisateur est le propriétaire
+    // Ne redirige PAS après succès de création de playlist Spotify
+    // Redirection uniquement pour suppression de galerie
+    if (modal.type === 'success' && modal.title === 'Succès !' && modal.message.includes('supprimée')) {
       navigate(canEdit ? '/mes-galeries' : '/galeries')
+    }
+  }
+
+  const handleGenerateSpotifyPlaylist = async () => {
+    setSpotifyModal({ show: true, playlist: null, loading: true, created: false })
+
+    try {
+      const response = await axios.get(
+        `http://localhost:8000/api/galeries/${id}/generate_spotify_playlist/`,
+        { withCredentials: true }
+      )
+      
+      if (response.data.success) {
+        setSpotifyModal({ show: true, playlist: response.data, loading: false, created: false })
+      } else {
+        setSpotifyModal({ show: false, playlist: null, loading: false, created: false })
+        setModal({
+          show: true,
+          title: 'Erreur',
+          message: response.data.error || 'Impossible de générer la playlist',
+          type: 'error'
+        })
+      }
+    } catch (err) {
+      console.error(err)
+      setSpotifyModal({ show: false, playlist: null, loading: false, created: false })
+      
+      setModal({
+        show: true,
+        title: 'Configuration Spotify requise',
+        message: err.response?.data?.error || 'Erreur lors de la génération de la playlist',
+        type: 'error'
+      })
+    }
+  }
+
+  const handleCreatePlaylistInSpotify = async () => {
+    if (!spotifyModal.playlist || !spotifyModal.playlist.tracks) {
+      return
+    }
+
+    try {
+      // Obtient l'URL d'autorisation Spotify
+      const authResponse = await axios.get(
+        `http://localhost:8000/api/spotify/auth-url/?galerie_id=${id}`,
+        { withCredentials: true }
+      )
+
+      // Stocke les track URIs dans le localStorage pour les récupérer après OAuth
+      const trackUris = spotifyModal.playlist.tracks.map(t => t.uri)
+      localStorage.setItem('spotify_pending_tracks', JSON.stringify(trackUris))
+      localStorage.setItem('spotify_pending_galerie_id', id)
+
+      // Redirige vers Spotify pour l'autorisation
+      window.location.href = authResponse.data.auth_url
+    } catch (err) {
+      console.error(err)
+      setModal({
+        show: true,
+        title: 'Erreur',
+        message: 'Impossible de se connecter à Spotify',
+        type: 'error'
+      })
+    }
+  }
+
+  // Vérifie si on revient du callback Spotify avec un token
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search)
+    const spotifyToken = urlParams.get('spotify_token')
+    
+    if (spotifyToken) {
+      const trackUris = JSON.parse(localStorage.getItem('spotify_pending_tracks') || '[]')
+      const galerieId = localStorage.getItem('spotify_pending_galerie_id')
+      
+      if (trackUris.length > 0 && galerieId === id) {
+        createPlaylistWithToken(spotifyToken, trackUris)
+      }
+      
+      // Nettoie le localStorage et l'URL
+      localStorage.removeItem('spotify_pending_tracks')
+      localStorage.removeItem('spotify_pending_galerie_id')
+      window.history.replaceState({}, document.title, window.location.pathname)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const createPlaylistWithToken = async (accessToken, trackUris) => {
+    try {
+      setSpotifyModal({ show: true, playlist: null, loading: true, created: false })
+      
+      const response = await axios.post(
+        'http://localhost:8000/api/spotify/create-playlist/',
+        {
+          access_token: accessToken,
+          galerie_id: id,
+          track_uris: trackUris
+        },
+        { withCredentials: true }
+      )
+
+      if (response.data.success) {
+        setSpotifyModal({ 
+          show: true, 
+          playlist: { ...response.data, playlistUrl: response.data.playlist_url }, 
+          loading: false,
+          created: true 
+        })
+        
+        // Ne pas afficher le modal général, le modal Spotify affiche déjà le succès
+      }
+    } catch (err) {
+      console.error(err)
+      setSpotifyModal({ show: false, playlist: null, loading: false, created: false })
+      setModal({
+        show: true,
+        title: 'Erreur',
+        message: 'Erreur lors de la création de la playlist',
+        type: 'error'
+      })
+    }
+  }
+
+  const handleAnalyzePalette = async () => {
+    setPaletteModal({ show: true, data: null, loading: true })
+
+    try {
+      const response = await axios.get(
+        `http://localhost:8000/api/galeries/${id}/palette/`,
+        { withCredentials: true }
+      )
+      
+      setPaletteModal({ show: true, data: response.data, loading: false })
+    } catch (err) {
+      console.error(err)
+      setPaletteModal({ show: false, data: null, loading: false })
+      setModal({
+        show: true,
+        title: 'Erreur',
+        message: err.response?.data?.error || 'Erreur lors de l\'analyse de la palette',
+        type: 'error'
+      })
     }
   }
 
@@ -376,6 +523,22 @@ const GalerieDetails = () => {
         galerieName={galerie?.nom || ''}
       />
 
+      <SpotifyModal
+        show={spotifyModal.show}
+        onClose={() => setSpotifyModal({ show: false, playlist: null, loading: false, created: false })}
+        playlist={spotifyModal.playlist}
+        loading={spotifyModal.loading}
+        created={spotifyModal.created}
+        onCreatePlaylist={handleCreatePlaylistInSpotify}
+      />
+
+      <ColorPaletteModal
+        show={paletteModal.show}
+        onClose={() => setPaletteModal({ show: false, data: null, loading: false })}
+        paletteData={paletteModal.data}
+        loading={paletteModal.loading}
+      />
+
       {/* Breadcrumb identique à project-2.html */}
       <div className="breadcumb-wrapper text-center" data-bg-src="/assets/img/bg/breadcrumb-bg.png">
         <div className="container">
@@ -509,16 +672,47 @@ const GalerieDetails = () => {
               </p>
               {canEdit && (
                 <Link to={`/galeries/${id}/oeuvres`} className="btn btn-primary">
-                  <i className="fas fa-plus me-2"></i>
-                  Ajouter des œuvres
+                  
+                  + Ajouter des œuvres
                 </Link>
               )}
             </div>
           )}
 
-          {/* Actions */}
+          {/* Spotify Button - Available for everyone */}
+          <div className="gallery-actions" style={{ marginTop: canEdit ? '20px' : '40px' }}>
+            <button
+              onClick={handleGenerateSpotifyPlaylist}
+              className="btn"
+              style={{ 
+                backgroundColor: '#1db954', 
+                borderColor: '#1db954', 
+                color: '#fff'
+              }}
+              title="Générer une playlist Spotify basée sur le thème de cette galerie"
+            >
+              <i className="fab fa-spotify me-2"></i>
+              Générer une Playlist Spotify
+            </button>
+          </div>
+
+          {/* Actions - Owner Only */}
           {canEdit && (
             <div className="gallery-actions">
+              <button
+                onClick={handleAnalyzePalette}
+                className="btn"
+                style={{ 
+                  backgroundColor: '#667eea', 
+                  borderColor: '#667eea', 
+                  color: '#fff'
+                }}
+                title="Analyser la palette de couleurs de cette galerie"
+              >
+                <i className="fas fa-palette me-2"></i>
+                Analyser la Palette
+              </button>
+              
               <Link 
                 to={`/galeries/${id}/oeuvres`} 
                 className="btn"
