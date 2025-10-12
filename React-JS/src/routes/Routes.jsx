@@ -54,6 +54,7 @@ const MailBox = lazy(() => import('@/app/(admin)/(app)/mailbox'));
 const Notes = lazy(() => import('@/app/(admin)/(app)/notes'));
 
 // dashboard
+const Dashboard = lazy(() => import('@/app/(admin)/(dashboards)/dashboard'));
 const Analytics = lazy(() => import('@/app/(admin)/(dashboards)/analytics'));
 const Email = lazy(() => import('@/app/(admin)/(dashboards)/email'));
 const Hr = lazy(() => import('@/app/(admin)/(dashboards)/hr'));
@@ -265,6 +266,10 @@ export const layoutsRoutes = [{
   path: '/notes',
   name: 'Notes',
   element: <Notes />
+}, {
+  path: '/dashboard',
+  name: 'Dashboard',
+  element: <Dashboard />
 }, {
   path: '/analytics',
   name: 'Analytics',

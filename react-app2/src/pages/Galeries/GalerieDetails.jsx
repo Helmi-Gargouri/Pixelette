@@ -8,6 +8,7 @@ import OeuvreModal from '../../components/OeuvreModal'
 import InviteModal from '../../components/InviteModal'
 import SpotifyModal from '../../components/SpotifyModal'
 import ColorPaletteModal from '../../components/ColorPaletteModal'
+import Gallery3D from '../../components/Gallery3D'
 
 const GalerieDetails = () => {
   const { id } = useParams()
@@ -23,6 +24,7 @@ const GalerieDetails = () => {
   const [inviteModal, setInviteModal] = useState(false)
   const [spotifyModal, setSpotifyModal] = useState({ show: false, playlist: null, loading: false })
   const [paletteModal, setPaletteModal] = useState({ show: false, data: null, loading: false })
+  const [gallery3D, setGallery3D] = useState(false)
 
   useEffect(() => {
     fetchGalerie()
@@ -539,6 +541,17 @@ const GalerieDetails = () => {
         loading={paletteModal.loading}
       />
 
+      {/* Galerie 3D Interactive */}
+      <Gallery3D
+        show={gallery3D}
+        onClose={() => {
+          console.log('Fermeture galerie 3D')
+          setGallery3D(false)
+        }}
+        oeuvres={galerie?.oeuvres_list || []}
+        galerieName={galerie?.nom || ''}
+      />
+
       {/* Breadcrumb identique à project-2.html */}
       <div className="breadcumb-wrapper text-center" data-bg-src="/assets/img/bg/breadcrumb-bg.png">
         <div className="container">
@@ -679,8 +692,28 @@ const GalerieDetails = () => {
             </div>
           )}
 
-          {/* Spotify Button - Available for everyone */}
+          {/* Boutons disponibles pour tous */}
           <div className="gallery-actions" style={{ marginTop: canEdit ? '20px' : '40px' }}>
+            <button
+              onClick={() => {
+                console.log('Bouton 3D cliqué!')
+                console.log('Galerie:', galerie)
+                console.log('Oeuvres list:', galerie?.oeuvres_list)
+                setGallery3D(true)
+              }}
+              className="btn"
+              style={{ 
+                backgroundColor: '#667eea', 
+                borderColor: '#667eea', 
+                color: '#fff'
+              }}
+              title="Visiter la galerie en 3D"
+              disabled={!galerie?.oeuvres_list || galerie.oeuvres_list.length === 0}
+            >
+              <i className="fas fa-cube me-2"></i>
+              Visiter la galerie en 3D
+            </button>
+
             <button
               onClick={handleGenerateSpotifyPlaylist}
               className="btn"

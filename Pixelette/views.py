@@ -67,13 +67,19 @@ class UtilisateurViewSet(viewsets.ModelViewSet):
     permission_classes = [AllowAny]  
 
     def get_permissions(self):
-        if self.action in ['create', 'login', 'profile', 'logout',  'generate_2fa', 'enable_2fa', 'verify_2fa', 'disable_2fa', 'get_2fa_qr', 'request_artist_role','reset_password_code','forgot_password','verify_code','request_password_reset']:
+        if self.action in ['create', 'login', 'profile', 'logout',  'generate_2fa', 'enable_2fa', 'verify_2fa', 'disable_2fa', 'get_2fa_qr', 'request_artist_role','reset_password_code','forgot_password','verify_code','request_password_reset', 'count']:
             permission_classes = [AllowAny]
         elif self.action == 'assign_role':
             permission_classes = [IsAuthenticated]  
         else:
             permission_classes = [IsAuthenticated]
         return [permission() for permission in permission_classes]
+    
+    @action(detail=False, methods=['get'], permission_classes=[AllowAny])
+    def count(self, request):
+        """Compte le nombre total d'utilisateurs - accessible à tous"""
+        total = Utilisateur.objects.count()
+        return Response({'count': total})
 
     def perform_update(self, serializer):
         if self.request.user.id == serializer.instance.id:

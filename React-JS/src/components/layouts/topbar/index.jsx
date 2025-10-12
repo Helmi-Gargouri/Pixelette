@@ -168,7 +168,7 @@ const Topbar = () => {
             </div>
             <input type="search" id="topbar-search" className="form-input px-12 text-sm rounded border-transparent focus:border-transparent w-60" placeholder="Search something..." />
             <button type="button" className="absolute inset-y-0 end-0 flex items-center pe-4">
-              <span className="ms-auto font-medium">⌘ K</span>
+              <span className="ms-auto font-medium">⌘</span>
             </button>
           </div>
         </div>

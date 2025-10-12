@@ -9,13 +9,13 @@ const Sidebar = () => {
   return <aside id="app-menu" className="app-menu">
       <Link to="/index" className="logo-box sticky top-0 flex min-h-topbar-height items-center justify-start px-6 backdrop-blur-xs">
         <div className="logo-light">
-          <img src={logoLight} className="logo-lg h-6" alt="Light logo" width={111} />
-          <img src={logoSm} className="logo-sm h-6" alt="Small logo" />
+          <img src={logoLight} className="logo-lg h-12 w-auto mt-4" alt="Light logo" />
+          <img src={logoSm} className="logo-sm w-6" alt="Small logo" />
         </div>
 
         <div className="logo-dark">
-          <img src={logoDark} className="logo-lg h-6" alt="Dark logo" width={111} />
-          <img src={logoSm} className="logo-sm h-6" alt="Small logo" />
+          <img src={logoDark} className="logo-lg h-12 w-auto mt-4" alt="Dark logo"  />
+          <img src={logoSm} className="logo-sm w-6" alt="Small logo" /> 
         </div>
       </Link>
 

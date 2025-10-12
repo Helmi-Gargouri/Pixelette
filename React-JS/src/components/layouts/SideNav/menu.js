@@ -1,5 +1,28 @@
-import { LuCalendar1, LuCircuitBoard, LuClipboardList, LuCodesandbox, LuFileText, LuFingerprint, LuLayoutPanelLeft, LuLock, LuMail, LuMessagesSquare, LuMonitorDot, LuPackage, LuPictureInPicture2, LuShare2, LuShieldCheck, LuShoppingBag, LuSquareUserRound, LuImage, LuPalette } from 'react-icons/lu';
+import { LuCalendar1, LuCircuitBoard, LuClipboardList, LuCodesandbox, LuFileText, LuFingerprint, LuLayoutPanelLeft, LuLock, LuMail, LuMessagesSquare, LuMonitorDot, LuPackage, LuPictureInPicture2, LuShare2, LuShieldCheck, LuShoppingBag, LuSquareUserRound, LuImage, LuPalette, LuLayoutDashboard } from 'react-icons/lu';
 export const menuItemsData = [{
+  key: 'Dashboard-Section',
+  label: 'Dashboard',
+  isTitle: true
+}, {
+  key: 'Dashboard',
+  label: 'Dashboard',
+  icon: LuLayoutDashboard,
+  href: '/dashboard'
+}, {
+  key: 'Nos Gestion',
+  label: 'Nos Gestion',
+  isTitle: true
+}, {
+  key: 'Oeuvres',
+  label: 'Œuvres',
+  icon: LuImage,
+  href: '/oeuvres-grid'
+}, {
+  key: 'Galeries',
+  label: 'Galeries',
+  icon: LuPalette,
+  href: '/galeries-list'
+}, {
   key: 'Overview',
   label: 'Overview',
   isTitle: true
@@ -218,24 +241,6 @@ export const menuItemsData = [{
     key: 'Grid View',
     label: 'Grid View',
     href: '/users-grid'
-  }]
-}, {
-  key: 'Oeuvres',
-  label: 'Œuvres',
-  icon: LuImage,
-  children: [{
-    key: 'Grid View',
-    label: 'Vue Grille',
-    href: '/oeuvres-grid'
-  }]
-}, {
-  key: 'Galeries',
-  label: 'Galeries',
-  icon: LuPalette,
-  children: [{
-    key: 'List View',
-    label: 'Liste',
-    href: '/galeries-list'
   }]
 }, {
   key: 'Extra',
