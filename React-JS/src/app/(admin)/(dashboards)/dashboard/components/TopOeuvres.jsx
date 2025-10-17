@@ -3,14 +3,31 @@ const TopOeuvres = ({ oeuvres = [] }) => {
   const topOeuvres = [...oeuvres]
     .sort((a, b) => new Date(b.date_ajout || b.id) - new Date(a.date_ajout || a.id))
     .slice(0, 10)
-    .map((oeuvre, index) => ({
-      id: oeuvre.id,
-      titre: oeuvre.titre || 'Sans titre',
-      artiste: oeuvre.artiste || 'Inconnu',
-      annee: oeuvre.annee_creation || '-',
-      technique: oeuvre.technique || '-',
-      rank: index + 1
-    }));
+    .map((oeuvre, index) => {
+      // Safe artist name resolution (backend may provide auteur_nom or nested auteur)
+      let artisteName = 'Inconnu'
+      if (oeuvre.auteur_nom) {
+        artisteName = oeuvre.auteur_nom
+      } else if (oeuvre.auteur && typeof oeuvre.auteur === 'object') {
+        const prenom = oeuvre.auteur.prenom || ''
+        const nom = oeuvre.auteur.nom || ''
+        const full = `${prenom} ${nom}`.trim()
+        if (full) artisteName = full
+      } else if (typeof oeuvre.auteur === 'string' && oeuvre.auteur.trim()) {
+        artisteName = oeuvre.auteur
+      } else if (oeuvre.artiste) {
+        artisteName = oeuvre.artiste
+      }
+
+      return {
+        id: oeuvre.id,
+        titre: oeuvre.titre || 'Sans titre',
+        artiste: artisteName,
+        annee: oeuvre.annee_creation || '-',
+        technique: oeuvre.technique || '-',
+        rank: index + 1
+      }
+    });
 
   if (topOeuvres.length === 0) {
     return (

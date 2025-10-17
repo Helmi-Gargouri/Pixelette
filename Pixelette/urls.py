@@ -21,9 +21,12 @@ from django.conf import settings
 from django.conf.urls.static import static  
 from .views import (
     UtilisateurViewSet, OeuvreViewSet, GalerieViewSet, InteractionViewSet, 
-    StatistiqueViewSet, DemandeRoleViewSet, spotify_create_playlist, 
-    spotify_auth_url, spotify_callback
+    StatistiqueViewSet, DemandeRoleViewSet, SavedStatViewSet, spotify_create_playlist, 
+    spotify_auth_url, spotify_callback, whoami
 )
+from .views import users_by_date
+from .views import views_by_artist
+from .views import generate_summary_pdf
 
 
 router = routers.DefaultRouter()
@@ -32,13 +35,20 @@ router.register(r'oeuvres', OeuvreViewSet)
 router.register(r'galeries', GalerieViewSet)
 router.register(r'interactions', InteractionViewSet)
 router.register(r'statistiques', StatistiqueViewSet)
+router.register(r'saved-stats', SavedStatViewSet)
 router.register(r'demandes', DemandeRoleViewSet)  # ← AJOUTE ÇA
 urlpatterns = [
     path('admin/', admin.site.urls),
+    # specific API routes first
+    path('api/stats/views-by-artist/', views_by_artist, name='views_by_artist'),
     path('api/', include(router.urls)),
     path('api/spotify/create-playlist/', spotify_create_playlist, name='spotify_create_playlist'),
     path('api/spotify/auth-url/', spotify_auth_url, name='spotify_auth_url'),
     path('api/spotify/callback/', spotify_callback, name='spotify_callback'),
+    path('api/whoami/', whoami, name='whoami'),
+    path('api/users/by-date/', users_by_date, name='users_by_date'),
+    path('api/stats/views-by-artist/', views_by_artist, name='views_by_artist'),
+    path('api/reports/summary/', generate_summary_pdf, name='generate_summary_pdf'),
 ]
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

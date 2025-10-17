@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import ReactApexChart from 'react-apexcharts';
+
 const ApexChartClient = ({
   type,
   height,

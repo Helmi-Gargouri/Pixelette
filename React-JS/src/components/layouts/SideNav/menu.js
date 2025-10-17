@@ -9,12 +9,12 @@ export const menuItemsData = [{
   icon: LuLayoutDashboard,
   href: '/dashboard'
 }, {
-  key: 'Users',
+  key: 'UsersList',
   label: 'Users',
   icon: LuSquareUserRound,
   href: '/users-list',
 }, {
-  key: 'Users',
+  key: 'UsersGrid',
   label: 'Users',
   icon: LuSquareUserRound,
   href: '/users-grid',

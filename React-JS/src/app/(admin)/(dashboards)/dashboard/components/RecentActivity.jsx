@@ -39,11 +39,29 @@ const RecentActivity = ({ oeuvres = [], galeries = [] }) => {
     .slice(0, 3);
   
   recentOeuvres.forEach(oeuvre => {
+    // Determine a safe display name for the author. API may return:
+    // - oeuvre.auteur_nom (string)
+    // - oeuvre.auteur as an object { prenom, nom }
+    // - oeuvre.auteur as a numeric id
+    // - oeuvre.artiste as legacy string
+    let auteurName = 'Inconnu'
+    if (oeuvre.auteur_nom) {
+      auteurName = oeuvre.auteur_nom
+    } else if (oeuvre.auteur && typeof oeuvre.auteur === 'object') {
+      const prenom = oeuvre.auteur.prenom || ''
+      const nom = oeuvre.auteur.nom || ''
+      const full = `${prenom} ${nom}`.trim()
+      if (full) auteurName = full
+    } else if (typeof oeuvre.auteur === 'string' && oeuvre.auteur.trim()) {
+      auteurName = oeuvre.auteur
+    } else if (oeuvre.artiste) {
+      auteurName = oeuvre.artiste
+    }
     recentItems.push({
       type: 'oeuvre',
       icon: LuImage,
       title: 'Nouvelle œuvre ajoutée',
-      description: `"${oeuvre.titre || 'Sans titre'}" par ${oeuvre.artiste || 'Inconnu'}`,
+      description: `"${oeuvre.titre || 'Sans titre'}" par ${auteurName}`,
       time: formatTimeAgo(oeuvre.date_ajout || new Date()),
       date: new Date(oeuvre.date_ajout || new Date()),
       bgClass: 'bg-blue-100',

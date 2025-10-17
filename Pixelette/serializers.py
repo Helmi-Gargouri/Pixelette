@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Utilisateur, Oeuvre, Galerie, Interaction, Statistique, DemandeRole, GalerieInvitation
+from .models import Utilisateur, Oeuvre, Galerie, Interaction, Statistique, DemandeRole, GalerieInvitation, SavedStat
 from django.contrib.auth.hashers import make_password  
 import pyotp
 
@@ -56,8 +56,10 @@ class UtilisateurSerializer(serializers.ModelSerializer):
         return representation
 
 class OeuvreSerializer(serializers.ModelSerializer):
+    auteur_nom = serializers.SerializerMethodField(read_only=True)
     class Meta:
         model = Oeuvre
+        # expose all model fields; the SerializerMethodField 'auteur_nom' is declared above and will be included
         fields = '__all__'
         
     def to_representation(self, instance):
@@ -68,7 +70,17 @@ class OeuvreSerializer(serializers.ModelSerializer):
                 representation['image'] = request.build_absolute_uri(instance.image.url)
             else:
                 representation['image'] = instance.image.url
+        # add author display name
+        try:
+            representation['auteur_nom'] = f"{instance.auteur.prenom} {instance.auteur.nom}"
+        except Exception:
+            representation['auteur_nom'] = None
         return representation
+
+    def get_auteur_nom(self, obj):
+        if obj.auteur:
+            return f"{obj.auteur.prenom} {obj.auteur.nom}"
+        return None
 
 class GalerieSerializer(serializers.ModelSerializer):
     oeuvres_count = serializers.SerializerMethodField()
@@ -76,7 +88,7 @@ class GalerieSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Galerie
-        fields = ['id', 'nom', 'description', 'theme', 'proprietaire', 'privee', 'oeuvres', 'oeuvres_count', 'oeuvres_list', 'date_creation']
+        fields = ['id', 'nom', 'description', 'theme', 'proprietaire', 'privee', 'oeuvres', 'oeuvres_count', 'oeuvres_list', 'date_creation', 'vues']
     
     def get_oeuvres_count(self, obj):
         return obj.oeuvres.count()
@@ -104,6 +116,19 @@ class StatistiqueSerializer(serializers.ModelSerializer):
     class Meta:
         model = Statistique
         fields = '__all__'
+
+
+class SavedStatSerializer(serializers.ModelSerializer):
+    created_by_name = serializers.SerializerMethodField(read_only=True)
+
+    class Meta:
+        model = SavedStat
+        fields = ['id', 'title', 'chart_type', 'subject', 'subject_field', 'config', 'created_by', 'created_by_name', 'created_at']
+
+    def get_created_by_name(self, obj):
+        if obj.created_by:
+            return f"{obj.created_by.prenom} {obj.created_by.nom}"
+        return None
 
 class DemandeRoleSerializer(serializers.ModelSerializer):
     utilisateur_nom = serializers.SerializerMethodField()  

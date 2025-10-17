@@ -14,6 +14,7 @@ const MesOeuvres = () => {
   const [sortBy, setSortBy] = useState('recent')
   const [modal, setModal] = useState({ show: false, title: '', message: '', type: 'success' })
   const [confirmModal, setConfirmModal] = useState({ show: false, oeuvreId: null })
+  const [predictingId, setPredictingId] = useState(null)
   const { user, isAuthenticated } = useAuth()
   const navigate = useNavigate()
 
@@ -101,6 +102,42 @@ const MesOeuvres = () => {
         message: 'Erreur lors de la suppression', 
         type: 'error' 
       })
+    }
+  }
+
+  const handlePredictClick = async (oeuvre) => {
+    setPredictingId(oeuvre.id)
+    try {
+      const response = await axios.post(
+        `http://localhost:8000/api/oeuvres/${oeuvre.id}/predict_popularity/`,
+        {},
+        { withCredentials: true }
+      )
+
+      const data = response.data || {}
+      const tips = data.tips || []
+      const aiAdvice = data.ai_advice || ''
+
+      let message = ''
+      if (data.predicted_views !== undefined) {
+        message += `Vues prévues : ${data.predicted_views}`
+      }
+      if (data.confidence !== undefined) {
+        message += `\nConfiance : ${data.confidence}`
+      }
+      if (tips.length) {
+        message += `\n\nConseils :\n- ${tips.join('\n- ')}`
+      }
+      if (aiAdvice) {
+        message += `\n\nConseil IA :\n${aiAdvice}`
+      }
+
+      setModal({ show: true, title: `Prédiction — ${oeuvre.titre}`, message: message, type: 'success' })
+    } catch (err) {
+      console.error('Prediction error', err)
+      setModal({ show: true, title: 'Erreur de prédiction', message: 'Impossible de prédire la popularité pour le moment.', type: 'error' })
+    } finally {
+      setPredictingId(null)
     }
   }
 
@@ -363,6 +400,22 @@ const MesOeuvres = () => {
                             <i className="fas fa-edit me-1"></i>
                             Modifier
                           </Link>
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault()
+                              handlePredictClick(oeuvre)
+                            }}
+                            className="btn btn-sm flex-fill"
+                            style={{
+                              backgroundColor: '#0d6efd',
+                              borderColor: '#0d6efd',
+                              color: '#fff'
+                            }}
+                            disabled={predictingId === oeuvre.id}
+                          >
+                            <i className="fas fa-chart-line me-1"></i>
+                            {predictingId === oeuvre.id ? 'Prédiction...' : 'Prédire popularité'}
+                          </button>
                           <button 
                             onClick={(e) => {
                               e.preventDefault()
@@ -454,6 +507,22 @@ const MesOeuvres = () => {
                             <i className="fas fa-edit me-1"></i>
                             Modifier
                           </Link>
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault()
+                              handlePredictClick(oeuvre)
+                            }}
+                            className="btn btn-sm flex-fill"
+                            style={{
+                              backgroundColor: '#0d6efd',
+                              borderColor: '#0d6efd',
+                              color: '#fff'
+                            }}
+                            disabled={predictingId === oeuvre.id}
+                          >
+                            <i className="fas fa-chart-line me-1"></i>
+                            {predictingId === oeuvre.id ? 'Prédiction...' : 'Prédire popularité'}
+                          </button>
                           <button 
                             onClick={(e) => {
                               e.preventDefault()

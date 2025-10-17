@@ -1,13 +1,10 @@
 import ApexChartClient from '@/components/client-wrapper/ApexChartClient';
+import { useState, useEffect } from 'react';
 
 const GaleriesStats = ({ galeries = [], oeuvres = [] }) => {
-  // Calculer le nombre de galeries et œuvres par mois
   const currentYear = new Date().getFullYear();
   const galeriesData = Array(12).fill(0);
   const oeuvresData = Array(12).fill(0);
-  
-  console.log('GaleriesStats - Nombre total d\'œuvres:', oeuvres.length);
-  console.log('GaleriesStats - Première œuvre:', oeuvres[0]);
   
   galeries.forEach(galerie => {
     const dateStr = galerie.date_creation || galerie.created_at || galerie.date_ajout;
@@ -20,34 +17,17 @@ const GaleriesStats = ({ galeries = [], oeuvres = [] }) => {
     }
   });
 
-  oeuvres.forEach((oeuvre, index) => {
-    // Le champ dans Django s'appelle date_creation pour les œuvres
+  oeuvres.forEach(oeuvre => {
     const dateStr = oeuvre.date_creation || oeuvre.created_at || oeuvre.date_ajout;
     if (dateStr) {
       const date = new Date(dateStr);
-      if (!isNaN(date.getTime())) {
-        if (index === 0) {
-          console.log('Première œuvre - date string:', dateStr);
-          console.log('Première œuvre - date parsed:', date);
-          console.log('Première œuvre - année:', date.getFullYear());
-          console.log('Première œuvre - mois:', date.getMonth());
-        }
-        if (date.getFullYear() === currentYear) {
-          const month = date.getMonth();
-          oeuvresData[month]++;
-        }
-      } else {
-        console.warn('Date invalide pour l\'œuvre:', oeuvre);
+      if (!isNaN(date.getTime()) && date.getFullYear() === currentYear) {
+        const month = date.getMonth();
+        oeuvresData[month]++;
       }
-    } else {
-      console.warn('Oeuvre sans date:', oeuvre);
     }
   });
 
-  console.log('Données œuvres par mois:', oeuvresData);
-  console.log('Données galeries par mois:', galeriesData);
-
-  // Calculer les galeries publiques et privées
   const galeriesPubliques = galeries.filter(g => !g.privee).length;
   const galeriesPrivees = galeries.filter(g => g.privee).length;
 
@@ -67,36 +47,30 @@ const GaleriesStats = ({ galeries = [], oeuvres = [] }) => {
         type: 'bar',
         height: 350,
         toolbar: {
-          show: false
+          show: true,
+          tools: {
+            download: true,
+            selection: true,
+            zoom: true,
+            zoomin: true,
+            zoomout: true,
+            pan: true,
+            reset: true
+          }
         },
-        fontFamily: 'inherit'
+        fontFamily: 'inherit',
+        background: 'transparent'
       },
       plotOptions: {
         bar: {
           horizontal: false,
-          columnWidth: '60%',
-          endingShape: 'rounded',
-          dataLabels: {
-            position: 'top',
-            hideOverflowingLabels: false
-          }
+          columnWidth: '55%',
+          borderRadius: 8,
+          borderRadiusApplication: 'end',
         }
       },
       dataLabels: {
-        enabled: true,
-        offsetY: -20,
-        style: {
-          fontSize: '11px',
-          colors: ['#304758'],
-          fontWeight: 600
-        },
-        background: {
-          enabled: false
-        },
-        formatter: function (val, opts) {
-          // Afficher toujours la valeur, même 0
-          return val;
-        }
+        enabled: false
       },
       stroke: {
         show: true,
@@ -107,13 +81,29 @@ const GaleriesStats = ({ galeries = [], oeuvres = [] }) => {
         categories: ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc'],
         labels: {
           style: {
-            fontSize: '11px'
+            fontSize: '12px',
+            fontWeight: 500
           }
+        },
+        axisBorder: {
+          show: false
+        },
+        axisTicks: {
+          show: false
         }
       },
-      colors: ['#f59e0b', '#3b82f6'],
+      colors: ['#3b82f6', '#10b981'],
       fill: {
-        opacity: 1
+        opacity: 1,
+        type: 'gradient',
+        gradient: {
+          shade: 'light',
+          type: 'vertical',
+          shadeIntensity: 0.3,
+          gradientToColors: ['#3b82f6', '#10b981'],
+          opacityFrom: 0.9,
+          opacityTo: 0.8,
+        }
       },
       yaxis: {
         title: {
@@ -123,22 +113,22 @@ const GaleriesStats = ({ galeries = [], oeuvres = [] }) => {
             fontWeight: 500
           }
         },
-        min: 0,
-        forceNiceScale: true
+        min: 0
       },
       legend: {
         position: 'top',
-        horizontalAlign: 'left',
+        horizontalAlign: 'right',
         fontSize: '13px',
         markers: {
-          width: 10,
-          height: 10,
-          radius: 2
+          width: 12,
+          height: 12,
+          radius: 6
         }
       },
       tooltip: {
         shared: true,
         intersect: false,
+        theme: 'light',
         y: {
           formatter: function (val) {
             return val + ' élément' + (val > 1 ? 's' : '');
@@ -146,7 +136,8 @@ const GaleriesStats = ({ galeries = [], oeuvres = [] }) => {
         }
       },
       grid: {
-        borderColor: '#f1f1f1',
+        borderColor: '#f1f5f9',
+        strokeDashArray: 5,
         padding: {
           top: 0,
           right: 0,
@@ -157,119 +148,120 @@ const GaleriesStats = ({ galeries = [], oeuvres = [] }) => {
     };
   };
 
-  const getPieChartOptions = () => {
-    const total = galeriesPubliques + galeriesPrivees;
-    
-    return {
-      series: [galeriesPubliques, galeriesPrivees],
-      chart: {
-        type: 'donut',
-        height: 350
-      },
-      labels: ['Galeries Publiques', 'Galeries Privées'],
-      colors: ['#10b981', '#ef4444'],
-      plotOptions: {
-        pie: {
-          donut: {
-            size: '70%',
-            labels: {
-              show: true,
-              total: {
-                show: true,
-                label: 'Total',
-                fontSize: '16px',
-                fontWeight: 600,
-                formatter: function (w) {
-                  return total;
-                }
-              },
-              value: {
-                show: true,
-                fontSize: '24px',
-                fontWeight: 700,
-                formatter: function (val) {
-                  return val;
-                }
-              }
-            }
-          }
-        }
-      },
-      legend: {
-        position: 'bottom',
-        fontSize: '14px',
-        markers: {
-          width: 12,
-          height: 12,
-          radius: 12
-        }
-      },
-      dataLabels: {
-        enabled: true,
-        formatter: function (val, opts) {
-          return opts.w.config.series[opts.seriesIndex] + ' (' + Math.round(val) + '%)';
-        },
-        style: {
-          fontSize: '14px',
-          fontWeight: 'bold'
-        },
-        dropShadow: {
-          enabled: false
-        }
-      },
-      tooltip: {
-        y: {
-          formatter: function (val) {
-            return val + ' galerie' + (val > 1 ? 's' : '');
-          }
-        }
-      },
-      responsive: [{
-        breakpoint: 480,
-        options: {
-          chart: {
-            width: 300
-          },
-          legend: {
-            position: 'bottom'
-          }
-        }
-      }]
-    };
-  };
-
-  const barOptions = getBarChartOptions();
-  const pieOptions = getPieChartOptions();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true) }, []);
 
   return (
-    <div className="grid lg:grid-cols-2 grid-cols-1 gap-5 mb-5">
-      <div className="card">
-        <div className="card-body">
-          <div className="flex items-center justify-between mb-4">
-            <h5 className="text-xl font-semibold text-default-800">Statistiques des Galeries & Œuvres</h5>
-            <span className="text-sm text-default-600">Année {currentYear}</span>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-semibold text-gray-900">Statistiques des Galeries & Œuvres</h2>
+          <p className="text-gray-600">Analyse des créations sur l'année {currentYear}</p>
+        </div>
+        <div className="flex items-center gap-2 text-sm text-gray-500">
+          <div className="flex items-center gap-1">
+            <div className="w-3 h-3 bg-blue-500 rounded"></div>
+            <span>Galeries</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <div className="w-3 h-3 bg-green-500 rounded"></div>
+            <span>Œuvres</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid lg:grid-cols-2 gap-6">
+        {/* Bar Chart Card */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-lg font-semibold text-gray-900">Évolution Mensuelle</h3>
+            <span className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">Année {currentYear}</span>
           </div>
           <ApexChartClient 
-            getOptions={() => barOptions} 
-            series={barOptions.series} 
+            getOptions={() => getBarChartOptions()} 
+            series={getBarChartOptions().series} 
             type="bar" 
             height={350} 
           />
         </div>
-      </div>
 
-      <div className="card">
-        <div className="card-body">
-          <div className="flex items-center justify-between mb-4">
-            <h5 className="text-xl font-semibold text-default-800">Répartition des Galeries</h5>
-            <span className="text-sm text-default-600">Public / Privé</span>
+        {/* Pie Chart Card */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-lg font-semibold text-gray-900">Répartition des Galeries</h3>
+            <span className="text-sm text-gray-500">Public vs Privé</span>
           </div>
-          <ApexChartClient 
-            getOptions={() => pieOptions} 
-            series={pieOptions.series} 
-            type="donut" 
-            height={350} 
-          />
+          
+          {mounted && (
+            <div className="space-y-6">
+              {/* Stats Summary */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="text-center p-4 bg-blue-50 rounded-lg">
+                  <div className="text-2xl font-bold text-blue-600">{galeriesPubliques}</div>
+                  <div className="text-sm text-blue-600 font-medium">Publiques</div>
+                </div>
+                <div className="text-center p-4 bg-purple-50 rounded-lg">
+                  <div className="text-2xl font-bold text-purple-600">{galeriesPrivees}</div>
+                  <div className="text-sm text-purple-600 font-medium">Privées</div>
+                </div>
+              </div>
+
+              {/* Chart */}
+              {galeriesPubliques + galeriesPrivees > 0 ? (
+                <div className="relative">
+                  <div className="mx-auto" style={{ maxWidth: '280px' }}>
+                    <ApexChartClient
+                      getOptions={() => ({
+                        chart: {
+                          type: 'donut',
+                          height: 280
+                        },
+                        labels: ['Galeries Publiques', 'Galeries Privées'],
+                        colors: ['#3b82f6', '#8b5cf6'],
+                        legend: {
+                          position: 'bottom',
+                          fontSize: '13px'
+                        },
+                        dataLabels: {
+                          enabled: true,
+                          dropShadow: { enabled: false },
+                          style: {
+                            fontSize: '13px',
+                            fontWeight: 600
+                          }
+                        },
+                        plotOptions: {
+                          pie: {
+                            donut: {
+                              size: '65%',
+                              labels: {
+                                show: true,
+                                total: {
+                                  show: true,
+                                  label: 'Total',
+                                  fontSize: '16px',
+                                  fontWeight: 600
+                                }
+                              }
+                            }
+                          }
+                        }
+                      })}
+                      series={[galeriesPubliques, galeriesPrivees]}
+                      type="donut"
+                      height={280}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-12">
+                  <div className="text-gray-400 text-lg mb-2">Aucune donnée disponible</div>
+                  <div className="text-gray-500 text-sm">Les galeries apparaîtront ici une fois créées</div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -277,4 +269,3 @@ const GaleriesStats = ({ galeries = [], oeuvres = [] }) => {
 };
 
 export default GaleriesStats;
-

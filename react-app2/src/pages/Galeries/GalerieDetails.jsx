@@ -591,6 +591,11 @@ const GalerieDetails = () => {
                 <i className="fas fa-images"></i>
                 {galerie.oeuvres_count || 0} œuvre{galerie.oeuvres_count !== 1 ? 's' : ''}
               </span>
+              
+              <span className="gallery-meta-badge bg-light text-dark">
+                <i className="fas fa-eye"></i>
+                {galerie.vues || 0} vue{(galerie.vues || 0) !== 1 ? 's' : ''}
+              </span>
             </div>
 
             <p style={{ fontSize: '1.1rem', color: '#666', marginBottom: 0 }}>

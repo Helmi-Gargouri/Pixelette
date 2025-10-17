@@ -51,6 +51,7 @@ class Oeuvre(models.Model):
     image = models.ImageField(upload_to="oeuvres/", verbose_name="Image", blank=True, null=True)
     date_creation = models.DateTimeField(auto_now_add=True, verbose_name="Date de création")
     auteur = models.ForeignKey(Utilisateur, on_delete=models.CASCADE, related_name="oeuvres", verbose_name="Auteur")
+    vues = models.PositiveIntegerField(default=0, verbose_name="Nombre de vues")
 
     def __str__(self):
         return self.titre
@@ -63,6 +64,7 @@ class Galerie(models.Model):
     privee = models.BooleanField(default=False, verbose_name="Privée")
     oeuvres = models.ManyToManyField(Oeuvre, related_name="galeries_associees", blank=True, verbose_name="Oeuvres")
     date_creation = models.DateTimeField(auto_now_add=True, verbose_name="Date de création")
+    vues = models.PositiveIntegerField(default=0, verbose_name="Nombre de vues")
 
     def __str__(self):
         return self.nom
@@ -132,6 +134,46 @@ class DemandeRole(models.Model):
 
     def __str__(self):
         return f"{self.utilisateur.prenom} {self.utilisateur.nom} → {self.nouveau_role} ({self.statut})"
+
+
+class SavedStat(models.Model):
+    """Configuration for admin-created dashboard statistics/charts.
+
+    Admins can create a SavedStat which describes a chart (pie/bar/line), the
+    subject model to aggregate (utilisateur/oeuvre/galerie), and the field to
+    group by (e.g. role, theme, privee, auteur, date_creation...). An optional
+    JSON `config` can include extra filters.
+    """
+    CHART_CHOICES = [
+        ('pie', 'Pie'),
+        ('donut', 'Donut'),
+        ('bar', 'Bar'),
+        ('line', 'Line'),
+        ('area', 'Area'),
+        ('treemap', 'Treemap'),
+        ('radar', 'Radar'),
+        ('radialBar', 'RadialBar'),
+    ]
+
+    SUBJECT_CHOICES = [
+        ('utilisateur', 'Utilisateur'),
+        ('oeuvre', 'Oeuvre'),
+        ('galerie', 'Galerie'),
+    ]
+
+    title = models.CharField(max_length=200)
+    chart_type = models.CharField(max_length=20, choices=CHART_CHOICES, default='pie')
+    subject = models.CharField(max_length=30, choices=SUBJECT_CHOICES)
+    subject_field = models.CharField(max_length=200, help_text='Field on subject model to group/count by')
+    config = models.JSONField(blank=True, null=True, help_text='Optional JSON config/filters')
+    created_by = models.ForeignKey(Utilisateur, on_delete=models.SET_NULL, null=True, related_name='saved_stats')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.title} ({self.chart_type})"
 
 from django.db.models.signals import post_save
 from django.dispatch import receiver

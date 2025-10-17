@@ -5,8 +5,10 @@ from .utils.clustering import cluster_galeries
 from .utils.spotify import generate_playlist_for_gallery, search_playlists_by_theme, get_spotify_oauth, create_playlist_in_user_account
 from rest_framework.permissions import IsAuthenticatedOrReadOnly
 from rest_framework import viewsets
-from .models import Utilisateur, Oeuvre, Galerie, Interaction, Statistique, GalerieInvitation
-from .serializers import UtilisateurSerializer, OeuvreSerializer, GalerieSerializer, InteractionSerializer, StatistiqueSerializer, GalerieInvitationSerializer
+from .models import Utilisateur, Oeuvre, Galerie, Interaction, Statistique, GalerieInvitation, SavedStat
+from .serializers import UtilisateurSerializer, OeuvreSerializer, GalerieSerializer, InteractionSerializer, StatistiqueSerializer, GalerieInvitationSerializer, SavedStatSerializer
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.decorators import method_decorator
 from rest_framework import status 
 from django.core.mail import send_mail
 from rest_framework.decorators import action  
@@ -35,6 +37,7 @@ from rest_framework import permissions
 from .serializers import ResetPasswordSerializer
 from django.conf import settings
 from datetime import timedelta
+import datetime
 import secrets  
 import hashlib
 import base64
@@ -46,10 +49,91 @@ import uuid
 import requests
 import io
 from PIL import Image
+from django.db.models import F
+
+
+# AI helper: try OpenAI first, then fallback to Google Generative (Gemini) if configured.
+def generate_ai_text(prompt, max_tokens=250, temperature=0.7, stop=None):
+    """Return generated text from available AI provider or None on failure.
+
+    Preference order:
+    1. settings.OPENAI_API_KEY -> OpenAI Chat Completions (gpt-3.5-turbo style)
+    2. settings.GEMINI_API_KEY_USER_1 or env GEMINI_API_KEY_USER_1 -> Google Generative API (text-bison)
+    """
+    try:
+        openai_key = getattr(settings, 'OPENAI_API_KEY', None)
+        if openai_key:
+            headers = {'Authorization': f'Bearer {openai_key}', 'Content-Type': 'application/json'}
+            data = {'model': 'gpt-3.5-turbo', 'messages': [{'role': 'user', 'content': prompt}], 'max_tokens': max_tokens, 'temperature': temperature}
+            resp = requests.post('https://api.openai.com/v1/chat/completions', headers=headers, json=data, timeout=12)
+            if resp.status_code == 200:
+                jr = resp.json()
+                return jr['choices'][0]['message']['content'].strip()
+
+        # Fallback to Gemini/Google Generative API (text-bison-001)
+        gemini_key = getattr(settings, 'GEMINI_API_KEY_USER_1', None) or __import__('os').environ.get('GEMINI_API_KEY_USER_1')
+        if gemini_key:
+            # Use text-bison model generate endpoint
+            base_url = 'https://generativelanguage.googleapis.com/v1beta2/models/text-bison-001:generate'
+            payload = {
+                'prompt': {'text': prompt},
+                'temperature': temperature,
+                'maxOutputTokens': int(max_tokens)
+            }
+            # Google supports simple API keys (AIza...) via ?key=YOUR_KEY; if the key looks like an API key use that
+            if str(gemini_key).startswith('AIza'):
+                url = f"{base_url}?key={gemini_key}"
+                headers = {'Content-Type': 'application/json'}
+            else:
+                # For service-account / OAuth tokens, use Bearer
+                url = base_url
+                headers = {'Authorization': f'Bearer {gemini_key}', 'Content-Type': 'application/json'}
+            resp = requests.post(url, headers=headers, json=payload, timeout=12)
+            if resp.status_code == 200:
+                jr = resp.json()
+                # Google Generative responses usually carry candidates with 'content'
+                cand = None
+                if isinstance(jr.get('candidates'), list) and jr['candidates']:
+                    cand = jr['candidates'][0].get('content')
+                # Some versions use 'output' or 'candidates[].content'
+                if not cand:
+                    # Try nested 'output' -> 'content'
+                    if isinstance(jr.get('output'), dict):
+                        cand = jr['output'].get('content')
+                if cand:
+                    return str(cand).strip()
+
+    except Exception:
+        # Do not raise on AI failures; return None to allow fallbacks
+        pass
+    return None
 
 class IsAdmin(permissions.BasePermission):
     def has_permission(self, request, view):
         return request.user and hasattr(request.user, 'role') and request.user.role == 'admin'
+
+
+class IsAdminOrSession(permissions.BasePermission):
+    """Permission that accepts either a DRF-authenticated Utilisateur with role 'admin'
+    or a session-based user_id pointing to an admin Utilisateur.
+    This allows the frontend (which uses cookies/session) to be treated as admin
+    even when request.user is not the custom Utilisateur instance.
+    """
+    def has_permission(self, request, view):
+        # First, try the normal DRF request.user
+        user = getattr(request, 'user', None)
+        if user and hasattr(user, 'role') and user.role == 'admin':
+            return True
+
+        # Fallback: check session for our custom user_id
+        uid = request.session.get('user_id')
+        if not uid:
+            return False
+        try:
+            u = Utilisateur.objects.get(id=uid)
+            return getattr(u, 'role', None) == 'admin'
+        except Utilisateur.DoesNotExist:
+            return False
     
 class CustomTokenGenerator(PasswordResetTokenGenerator):
     def _make_hash_value(self, user, timestamp):
@@ -403,6 +487,99 @@ class OeuvreViewSet(viewsets.ModelViewSet):
     queryset = Oeuvre.objects.all()
     serializer_class = OeuvreSerializer
     permission_classes = [AllowAny]
+
+    def retrieve(self, request, *args, **kwargs):
+        oeuvre = self.get_object()
+        # increment views atomically
+        try:
+            Oeuvre.objects.filter(pk=oeuvre.pk).update(vues=F('vues') + 1)
+            oeuvre.refresh_from_db(fields=['vues'])
+        except Exception:
+            pass
+        serializer = self.get_serializer(oeuvre)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
+    def predict_popularity(self, request, pk=None):
+        """Predict a popularity score (estimated views) and provide tips.
+
+        Uses a lightweight heuristic based on existing oeuvre averages, presence
+        of image, description length, and optionally calls OpenAI to produce
+        refined tips when OPENAI_API_KEY is set in settings.
+        """
+        try:
+            oeuvre = self.get_object()
+        except Exception:
+            return Response({'error': 'Oeuvre not found'}, status=404)
+
+        from django.db.models import Avg
+        from django.db.models.functions import Coalesce
+
+        try:
+            avg_views = Oeuvre.objects.aggregate(avg=Coalesce(Avg('vues'), 0))['avg'] or 0
+        except Exception:
+            avg_views = 0
+
+        # Base score
+        base = max(int(avg_views), 1)
+
+        # Features
+        desc = (oeuvre.description or '')
+        image_present = bool(getattr(oeuvre, 'image', None))
+        desc_len = len(desc)
+
+        # Heuristic multiplier
+        mult = 1.0
+        if image_present:
+            mult += 0.25
+        # longer descriptions -> slightly better discoverability
+        mult += min(0.5, desc_len / 2000)
+        # title length matters a bit
+        title_len = len((oeuvre.titre or ''))
+        mult += min(0.2, title_len / 200)
+
+        predicted = int(base * mult)
+
+        # Confidence roughly based on amount of information
+        confidence = min(95, 40 + (desc_len / 1000) * 40 + (20 if image_present else 0))
+
+        # Compose basic tips
+        tips = []
+        if not image_present:
+            tips.append('Ajoutez une image haute résolution de l\'œuvre — la qualité visuelle augmente fortement l\'engagement.')
+        if desc_len < 120:
+            tips.append('Rédigez une description plus détaillée (contexte, inspiration, matériaux) pour améliorer le référencement et l\'attractivité.')
+        if title_len < 5:
+            tips.append('Choisissez un titre plus descriptif et évocateur.')
+        # Promote tips
+        tips.append('Partagez l\'œuvre sur les réseaux sociaux et dans des galeries thématiques pour attirer un public ciblé.')
+        tips.append('Envisagez d\'utiliser des mots-clés pertinents et des balises pour améliorer la découverte.')
+
+        # Optionally ask an AI provider (OpenAI or Gemini) to refine tips and provide a short narrative
+        ai_advice = None
+        try:
+            prompt = (
+                f"You are an art marketing assistant. Given the following artwork data, estimate a reasonable monthly view count and give 4 concise suggestions to improve visibility:\n"
+                f"Title: {oeuvre.titre}\n"
+                f"Description: {desc}\n"
+                f"Image present: {image_present}\n"
+                f"Typical platform average views: {avg_views}\n"
+            )
+            ai_text = generate_ai_text(prompt, max_tokens=250, temperature=0.7)
+            if ai_text:
+                ai_advice = ai_text
+                tips.insert(0, ai_text)
+        except Exception:
+            ai_advice = None
+
+        result = {
+            'predicted_views': predicted,
+            'confidence': int(confidence),
+            'tips': tips,
+            'ai_advice': ai_advice
+        }
+
+        return Response(result)
     
     @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
     def generate_ai_image(self, request):
@@ -599,7 +776,16 @@ class GalerieViewSet(viewsets.ModelViewSet):
     
     def retrieve(self, request, *args, **kwargs):
         galerie = self.get_object()
-        
+
+        # increment views atomically to avoid race conditions
+        try:
+            Galerie.objects.filter(pk=galerie.pk).update(vues=F('vues') + 1)
+            # refresh instance so serializer returns updated value
+            galerie.refresh_from_db(fields=['vues'])
+        except Exception:
+            # If incrementing fails, continue without blocking access
+            pass
+
         # Si la galerie est publique, tout le monde peut y accéder
         if not galerie.privee:
             serializer = self.get_serializer(galerie)
@@ -839,6 +1025,225 @@ class StatistiqueViewSet(viewsets.ModelViewSet):
     queryset = Statistique.objects.all()
     serializer_class = StatistiqueSerializer
 
+
+@method_decorator(csrf_exempt, name='dispatch')
+class SavedStatViewSet(viewsets.ModelViewSet):
+    queryset = SavedStat.objects.all()
+    serializer_class = SavedStatSerializer
+
+    def get_permissions(self):
+        # Only admins can create/update/delete. Accept either a DRF-authenticated
+        # admin or a session-authenticated admin (IsAdminOrSession) so the browser
+        # session works for write operations too.
+        if self.action in ['create', 'update', 'partial_update', 'destroy']:
+            return [IsAdminOrSession()]
+        return [IsAdminOrSession()]
+
+    @action(detail=True, methods=['get'], permission_classes=[IsAdminOrSession])
+    def compute(self, request, pk=None):
+        """Compute the aggregated data for this saved stat and return labels/values for the frontend chart."""
+        try:
+            stat = self.get_object()
+        except Exception as e:
+            return Response({'error': 'SavedStat not found or other error', 'detail': str(e)}, status=404)
+
+        # Map subject to model
+        mapping = {
+            'utilisateur': Utilisateur,
+            'oeuvre': Oeuvre,
+            'galerie': Galerie,
+        }
+
+        Model = mapping.get(stat.subject)
+        if not Model:
+            return Response({'error': 'Subject model not supported'}, status=400)
+
+        field = stat.subject_field
+
+        # Basic safety: allow field names and related lookups using double underscores
+        import re
+        if not re.match(r'^[\w]+(?:__[\w]+)*$', field):
+            return Response({'error': 'Invalid subject_field'}, status=400)
+
+        # Build queryset and aggregation
+        qs = Model.objects.all()
+
+        # Apply filters from config if present (simple equality filters only)
+        cfg = stat.config or {}
+        filters = {}
+        for k, v in (cfg.get('filters') or {}).items():
+            # allow only simple keys
+            if re.match(r'^[\w]+$', k):
+                filters[k] = v
+        if filters:
+            qs = qs.filter(**filters)
+
+        # Group by field and count
+        try:
+            from django.db.models import Count
+
+            # helper to resolve nested attributes on a model instance
+            def resolve_attr(obj, attr_path):
+                parts = attr_path.split('__') if attr_path else []
+                cur = obj
+                for p in parts:
+                    if cur is None:
+                        return None
+                    # if cur is a dict-like (from values())
+                    if isinstance(cur, dict):
+                        cur = cur.get(p)
+                        continue
+                    # otherwise getattr
+                    cur = getattr(cur, p, None)
+                return cur
+
+            # allow callers to request a label_field in config to use for labels
+            label_field = (stat.config or {}).get('label_field')
+
+            # Special syntax: allow fields ending with '__count' to mean
+            # "count related items per model instance", e.g. 'oeuvres__count'
+            if field.endswith('__count'):
+                rel = field[:-7]
+                try:
+                    # Annotate model instances with the related count
+                    aggregation_qs = qs.annotate(_count=Count(rel)).order_by('-_count')
+                except Exception as e:
+                    return Response({'error': 'Invalid relation for __count', 'detail': str(e)}, status=400)
+
+                labels = []
+                values = []
+                for obj in aggregation_qs:
+                    if label_field:
+                        val = resolve_attr(obj, label_field)
+                        if val is None:
+                            val = str(obj)
+                    else:
+                        val = str(obj)
+                    labels.append(str(val))
+                    values.append(int(getattr(obj, '_count', 0) or 0))
+                return Response({'labels': labels, 'values': values})
+
+            # Otherwise support related lookups like 'auteur__role' as well
+            aggregation = qs.values(field).annotate(count=Count('id')).order_by('-count')
+
+            # Calendar output: if the config requests a calendar and the grouping
+            # field is a date (e.g. 'date_inscription__date'), return a contiguous
+            # list of date/value points so the frontend can render a calendar heatmap.
+            cfg_calendar = (stat.config or {}).get('calendar')
+            if cfg_calendar and field.endswith('__date'):
+                # Allow optional start/end query params (YYYY-MM-DD) to request a specific range
+                start_str = request.query_params.get('start')
+                end_str = request.query_params.get('end')
+                start_date = None
+                end_date = None
+                try:
+                    if start_str:
+                        start_date = datetime.date.fromisoformat(start_str)
+                    if end_str:
+                        end_date = datetime.date.fromisoformat(end_str)
+                except Exception:
+                    return Response({'error': 'Invalid start/end date format. Use YYYY-MM-DD.'}, status=400)
+
+                # If range provided, filter the queryset to that date range. We remove the trailing '__date' from
+                # the grouping field to build the proper lookup for filtering.
+                if start_date or end_date:
+                    base_lookup = field[:-6]  # remove '__date'
+                    # build the range tuple
+                    if not start_date:
+                        # pick a very early date
+                        start_date = datetime.date(1970, 1, 1)
+                    if not end_date:
+                        end_date = datetime.date.today()
+                    try:
+                        qs = qs.filter(**{f"{base_lookup}__date__range": (start_date, end_date)})
+                    except Exception as e:
+                        return Response({'error': 'Failed to apply date range filter', 'detail': str(e)}, status=400)
+
+                # re-run the aggregation with the possibly filtered queryset
+                aggregation = qs.values(field).annotate(count=Count('id')).order_by('-count')
+
+                counts = {}
+                for row in aggregation:
+                    k = row.get(field)
+                    if isinstance(k, (datetime.date, datetime.datetime)):
+                        date_str = k.strftime('%Y-%m-%d')
+                    else:
+                        date_str = str(k)
+                    counts[date_str] = int(row.get('count', 0))
+
+                # If a requested range was provided, use it to generate the contiguous points.
+                if start_date and end_date:
+                    min_date = start_date
+                    max_date = end_date
+                else:
+                    if not counts:
+                        return Response({'points': []})
+                    min_date = min(datetime.datetime.fromisoformat(d).date() for d in counts.keys())
+                    max_date = max(datetime.datetime.fromisoformat(d).date() for d in counts.keys())
+
+                cur = min_date
+                points = []
+                while cur <= max_date:
+                    ds = cur.strftime('%Y-%m-%d')
+                    points.append({'date': ds, 'value': counts.get(ds, 0)})
+                    cur += datetime.timedelta(days=1)
+
+                return Response({'points': points})
+
+            labels = []
+            values = []
+            for row in aggregation:
+                # if label_field requested, try to resolve on the row dict or underlying objects
+                if label_field:
+                    # row is a dict from values()
+                    val = row.get(label_field)
+                    if val is None:
+                        val = row.get(field)
+                else:
+                    val = row.get(field)
+                label = val if val is not None else 'None'
+                labels.append(str(label))
+                values.append(int(row.get('count', 0)))
+
+            return Response({'labels': labels, 'values': values})
+        except Exception as e:
+            # Return JSON error for frontend to display instead of a server 500
+            return Response({'error': 'Aggregation failed', 'detail': str(e)}, status=400)
+
+    def perform_create(self, serializer):
+        # Automatically set the creator to the current user (admin)
+        try:
+            serializer.save(created_by=self.request.user)
+        except Exception:
+            # Fallback: save without created_by if something goes wrong
+            serializer.save()
+
+    def create(self, request, *args, **kwargs):
+        # Support session-based creation: if DRF didn't authenticate (no header),
+        # look for our custom session user_id and treat that user as the creator.
+        user = None
+        if getattr(request, 'user', None) and getattr(request.user, 'is_authenticated', False):
+            user = request.user
+        else:
+            uid = request.session.get('user_id')
+            if uid:
+                try:
+                    user = Utilisateur.objects.get(id=uid)
+                except Utilisateur.DoesNotExist:
+                    user = None
+
+        if not user or getattr(user, 'role', None) != 'admin':
+            return Response({
+                'detail': 'You must be logged in as an admin to create a saved stat.\n'
+                          'Ensure you are authenticated via session (cookies) or provide a Token in the Authorization header.'
+            }, status=401)
+
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save(created_by=user)
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=201, headers=headers)
+
 class DemandeRoleViewSet(viewsets.ModelViewSet):
     queryset = DemandeRole.objects.all()
     serializer_class = DemandeRoleSerializer
@@ -887,7 +1292,7 @@ class DemandeRoleViewSet(viewsets.ModelViewSet):
 
 # ===== VUES SPOTIFY OAUTH =====
 
-from django.http import JsonResponse, HttpResponseRedirect
+from django.http import JsonResponse, HttpResponseRedirect, FileResponse
 from django.views.decorators.csrf import csrf_exempt
 
 @api_view(['POST'])
@@ -993,3 +1398,747 @@ def spotify_callback(request):
         import traceback
         traceback.print_exc()
         return HttpResponseRedirect(f"{settings.FRONTEND_URL}/galeries?error=spotify_callback_failed")
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def whoami(request):
+    """Debug endpoint: returns DRF-authenticated user and session-derived user info.
+
+    Use this from the browser or from the React app (with axios { withCredentials: true })
+    to confirm that cookies/session are being sent and that the session maps to a
+    `Utilisateur` with a role (e.g., 'admin').
+    """
+    drf_user = None
+    if getattr(request, 'user', None) and getattr(request.user, 'is_authenticated', False):
+        drf_user = {
+            'id': getattr(request.user, 'id', None),
+            'email': getattr(request.user, 'email', None),
+            'role': getattr(request.user, 'role', None)
+        }
+
+    session_user = None
+    session_uid = request.session.get('user_id')
+    if session_uid:
+        try:
+            u = Utilisateur.objects.get(id=session_uid)
+            session_user = {'id': u.id, 'email': u.email, 'role': u.role}
+        except Utilisateur.DoesNotExist:
+            session_user = {'id': session_uid, 'missing': True}
+
+    return JsonResponse({
+        'drf_user': drf_user,
+        'session_user': session_user,
+        'session_keys': list(request.session.keys()),
+    })
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticatedOrReadOnly])
+def users_by_date(request):
+    """Return a simple list of users who registered on a given date (YYYY-MM-DD).
+    Query param: date=YYYY-MM-DD
+    """
+    date_str = request.GET.get('date')
+    if not date_str:
+        return Response({'error': 'date param required (YYYY-MM-DD)'}, status=400)
+    try:
+        d = datetime.date.fromisoformat(date_str)
+    except Exception:
+        return Response({'error': 'invalid date format, use YYYY-MM-DD'}, status=400)
+
+    # filter by date_inscription date portion
+    users = Utilisateur.objects.filter(date_inscription__date=d)
+    data = [{'id': u.id, 'nom': u.nom, 'prenom': u.prenom, 'email': u.email} for u in users]
+    return Response({'date': date_str, 'count': users.count(), 'users': data})
+
+
+@api_view(['POST'])
+@permission_classes([IsAdminOrSession])
+def generate_summary_pdf(request):
+    """Generate a PDF summary of dashboard data and save it under MEDIA_ROOT/reports/.
+
+    Returns JSON: { report_url: <url> }
+    """
+    import io, os, datetime
+    from django.conf import settings
+    from django.urls import reverse
+
+    # Gather summary data
+    galeries = list(Galerie.objects.all())
+    oeuvres = list(Oeuvre.objects.all())
+
+    galeries_pub = sum(1 for g in galeries if not g.privee)
+    galeries_pri = sum(1 for g in galeries if g.privee)
+    total_oeuvres = len(oeuvres)
+
+    # Top galleries by vues
+    top_galeries = Galerie.objects.order_by('-vues')[:10]
+    top_oeuvres = Oeuvre.objects.order_by('-vues')[:10]
+
+    # Views per artist (reuse logic)
+    from django.db.models import Sum, F
+    from django.db.models.functions import Coalesce
+    artists_qs = Utilisateur.objects.annotate(
+        total_oeuvre_views=Coalesce(Sum('oeuvres__vues'), 0),
+        total_galerie_views=Coalesce(Sum('galeries__vues'), 0),
+    ).annotate(total_views=F('total_oeuvre_views') + F('total_galerie_views')).order_by('-total_views')[:20]
+
+    # Prepare textual summary
+    summary_lines = []
+    summary_lines.append(f"Rapport résumé — {datetime.datetime.utcnow().isoformat()}Z")
+    summary_lines.append("")
+    summary_lines.append(f"Galeries publiques: {galeries_pub}")
+    summary_lines.append(f"Galeries privées: {galeries_pri}")
+    summary_lines.append(f"Total œuvres: {total_oeuvres}")
+    summary_lines.append("")
+    summary_lines.append("Top Galeries (vues):")
+    for g in top_galeries:
+        summary_lines.append(f" - {g.nom} : {g.vues}")
+    summary_lines.append("")
+    summary_lines.append("Top Œuvres (vues):")
+    for o in top_oeuvres:
+        summary_lines.append(f" - {o.titre} : {o.vues}")
+    summary_lines.append("")
+    summary_lines.append("Top Artistes (vues totales):")
+    for a in artists_qs:
+        summary_lines.append(f" - {a.prenom} {a.nom} : {a.total_views}")
+
+    # Ensure reports dir
+    reports_dir = os.path.join(settings.MEDIA_ROOT, 'reports')
+    os.makedirs(reports_dir, exist_ok=True)
+
+    # Filename
+    filename_ts = datetime.datetime.utcnow().strftime('%Y%m%dT%H%M%SZ')
+    pdf_filename = f"dashboard_summary_{filename_ts}.pdf"
+    pdf_path = os.path.join(reports_dir, pdf_filename)
+
+    # Try to use reportlab to render a nicer PDF (with simple charts). If reportlab
+    # is not installed or an error occurs, fallback to a plain text file.
+    try:
+        from reportlab.lib.pagesizes import A4
+        from reportlab.pdfgen import canvas
+        from reportlab.lib import colors
+        from reportlab.lib.units import mm
+        from reportlab.lib.utils import ImageReader
+        # Force a non-interactive backend to avoid Tkinter / GUI issues when
+        # generating charts from a web thread/process (prevents the
+        # "Starting a Matplotlib GUI outside of the main thread" warnings).
+        try:
+            import matplotlib
+            matplotlib.use('Agg')
+            import matplotlib.pyplot as plt
+        except Exception:
+            # If matplotlib can't be configured, fallback and continue; the
+            # PDF generator will simply omit charts (text-only fallback remains).
+            plt = None
+
+        buffer = io.BytesIO()
+        c = canvas.Canvas(buffer, pagesize=A4)
+        width, height = A4
+
+        # tiny helper to wrap text
+        def draw_wrapped_text(x, y, text, font_name='Helvetica', font_size=10, leading=14, max_width=width - 80):
+            c.setFont(font_name, font_size)
+            words = text.split()
+            line = ''
+            cur_y = y
+            for w in words:
+                test = (line + ' ' + w).strip()
+                if c.stringWidth(test, font_name, font_size) > max_width:
+                    c.drawString(x, cur_y, line)
+                    cur_y -= leading
+                    line = w
+                else:
+                    line = test
+            if line:
+                c.drawString(x, cur_y, line)
+                cur_y -= leading
+            return cur_y
+
+        # sanitize text helper: normalize whitespace, fix stray punctuation and ensure short sentences
+        def sanitize_text(t):
+            if not t:
+                return ''
+            s = str(t)
+            # Replace newlines and multiple spaces with single space
+            s = ' '.join(s.replace('\r', ' ').replace('\n', ' ').split())
+            # Normalize bullets and separators
+            s = s.replace('•', ' • ')
+            s = ' '.join(s.split())
+            # Fix common typos like 'Vuezdada' or 'Vuez' by ensuring 'Vues:' token is present when a number exists
+            # If pattern like 'Vues' followed by non-digit, remove the garbage
+            s = s.replace('Vuezdada', '')
+            # Ensure sentence ends with a period for nicer wrapping (only if short)
+            if len(s) < 300 and not s.endswith('.') and not s.endswith('…'):
+                s = s.rstrip() + '.'
+            return s
+
+        # Chart helpers using matplotlib -> return ImageReader
+        def make_pie(pub_count, pri_count):
+            try:
+                fig, ax = plt.subplots(figsize=(3, 3), dpi=100)
+                sizes = [pub_count, pri_count]
+                labels = ['Publiques', 'Privées']
+                colors_list = ['#4CAF50', '#FF7043']
+                ax.pie(sizes, labels=labels, colors=colors_list, autopct='%1.0f%%', startangle=140, textprops={'fontsize': 9})
+                ax.axis('equal')
+                buf = io.BytesIO()
+                plt.tight_layout()
+                fig.savefig(buf, format='png', bbox_inches='tight', dpi=150)
+                plt.close(fig)
+                buf.seek(0)
+                return ImageReader(buf)
+            except Exception:
+                return None
+
+        def make_bar(names, values, title='', max_items=8):
+            try:
+                names = names[:max_items]
+                values = values[:max_items]
+                fig, ax = plt.subplots(figsize=(6, 3), dpi=100)
+                y_pos = range(len(names))[::-1]
+                ax.barh(range(len(names))[::-1], values, color='#1976D2')
+                ax.set_yticks(range(len(names))[::-1])
+                ax.set_yticklabels([n if len(n) < 30 else n[:27] + '...' for n in names])
+                ax.set_xlabel('Vues')
+                ax.set_title(title)
+                plt.tight_layout()
+                buf = io.BytesIO()
+                fig.savefig(buf, format='png', bbox_inches='tight', dpi=150)
+                plt.close(fig)
+                buf.seek(0)
+                return ImageReader(buf)
+            except Exception:
+                return None
+
+        # Cover page
+        c.setFillColor(colors.HexColor('#0f172a'))
+        c.rect(0, 0, width, height, stroke=0, fill=1)
+        c.setFillColor(colors.white)
+        c.setFont('Helvetica-Bold', 28)
+        c.drawCentredString(width / 2, height - 120, 'Rapport résumé — Pixelette')
+        c.setFont('Helvetica', 12)
+        c.drawCentredString(width / 2, height - 145, f"Généré le: {datetime.datetime.utcnow().isoformat()}Z")
+        c.setFont('Helvetica', 10)
+        c.drawCentredString(width / 2, height - 165, f"Galeries publiques: {galeries_pub} • Galeries privées: {galeries_pri} • Œuvres: {total_oeuvres}")
+        c.showPage()
+
+        # Main content page
+        y = height - 40
+        c.setFillColor(colors.black)
+
+        # --- Welcome top summary (big banner + metrics) ---
+        c.setFont('Helvetica-Bold', 20)
+        c.drawString(40, y, 'Bienvenue sur Pixelette 🎨')
+        y -= 26
+        c.setFont('Helvetica', 11)
+        welcome_text = f"Votre plateforme de gestion d'œuvres d'art et de galeries. Actuellement, vous gérez {total_oeuvres} œuvres réparties dans {len(galeries)} galeries."
+        y = draw_wrapped_text(40, y, welcome_text, font_size=11, leading=14, max_width=width - 80)
+        y -= 8
+
+        # Compute simple month-over-month deltas for display
+        now = datetime.datetime.utcnow()
+        delta_days = 30
+        try:
+            since = now - datetime.timedelta(days=delta_days)
+            prev_since = now - datetime.timedelta(days=delta_days * 2)
+            oeuvres_last = Oeuvre.objects.filter(date_creation__gte=since).count()
+            oeuvres_prev = Oeuvre.objects.filter(date_creation__gte=prev_since, date_creation__lt=since).count()
+            galeries_last = Galerie.objects.filter(date_creation__gte=since).count()
+            galeries_prev = Galerie.objects.filter(date_creation__gte=prev_since, date_creation__lt=since).count()
+            users_last = Utilisateur.objects.filter(date_inscription__gte=since).count()
+            users_prev = Utilisateur.objects.filter(date_inscription__gte=prev_since, date_inscription__lt=since).count()
+        except Exception:
+            oeuvres_last = oeuvres_prev = galeries_last = galeries_prev = users_last = users_prev = 0
+
+        def pct(new, old):
+            try:
+                if old == 0:
+                    return None
+                return round(((new - old) / old) * 100, 1)
+            except Exception:
+                return None
+
+        oeuvres_delta = pct(oeuvres_last, oeuvres_prev)
+        galeries_delta = pct(galeries_last, galeries_prev)
+        users_delta = pct(users_last, users_prev)
+
+        total_galeries = len(galeries)
+        galeries_pub_count = galeries_pub
+        avg_oeuvres_per_galerie = round((total_oeuvres / total_galeries) if total_galeries else 0, 1)
+
+        # Draw metric cards (simple grid)
+        box_x = 40
+        box_w = (width - 80)
+        card_h = 56
+        # We'll draw four small cards stacked horizontally when space allows
+        card_w = (box_w - 24) / 4
+
+        metrics = [
+            (str(total_oeuvres), f'Œuvres', oeuvres_delta),
+            (str(total_galeries), f'Galeries', galeries_delta),
+            (str(avg_oeuvres_per_galerie), f'Moyenne œuvres/galerie', None),
+            (str(Utilisateur.objects.count()), f'Utilisateurs', users_delta),
+        ]
+
+        cx = box_x
+        cy = y
+        c.setFont('Helvetica-Bold', 18)
+        for val, label, delta in metrics:
+            # Card background
+            c.setFillColor(colors.whitesmoke)
+            c.rect(cx - 6, cy - card_h, card_w + 12, card_h, stroke=0, fill=1)
+            c.setFillColor(colors.black)
+            # Value
+            c.setFont('Helvetica-Bold', 16)
+            c.drawString(cx, cy - 18, val)
+            # Label
+            c.setFont('Helvetica', 9)
+            c.drawString(cx, cy - 34, label)
+            # Delta if available
+            if delta is not None:
+                try:
+                    delta_text = f"{delta:+.1f}% ce mois"
+                    c.setFont('Helvetica', 8)
+                    c.setFillColor(colors.HexColor('#16a34a') if delta >= 0 else colors.red)
+                    c.drawString(cx + card_w - 60, cy - 18, delta_text)
+                    c.setFillColor(colors.black)
+                except Exception:
+                    pass
+
+            cx += card_w + 8
+
+        y = cy - card_h - 12
+
+        # Small CTA line
+        c.setFont('Helvetica-Bold', 11)
+        c.drawString(40, y, 'Voir les œuvres')
+        y -= 22
+
+        # Continue with the rest of the synthese
+        c.setFont('Helvetica-Bold', 16)
+        c.drawString(40, y, 'Synthèse')
+        y -= 22
+
+        # AI or template summary
+        ai_summary = None
+        try:
+            prompt_lines = [
+                "Please write a short, friendly French summary (3-4 sentences) of the following dashboard data:",
+                f"Galeries publiques: {galeries_pub}",
+                f"Galeries privées: {galeries_pri}",
+                f"Total œuvres: {total_oeuvres}",
+                "Top galeries (name: views):",
+            ]
+            for g in top_galeries[:5]:
+                prompt_lines.append(f"- {g.nom}: {g.vues}")
+            prompt_lines.append("Top œuvres (name: views):")
+            for o in top_oeuvres[:5]:
+                prompt_lines.append(f"- {o.titre}: {o.vues}")
+
+            prompt = '\n'.join(prompt_lines)
+            ai_summary = generate_ai_text(prompt, max_tokens=250, temperature=0.7)
+        except Exception:
+            ai_summary = None
+
+        if not ai_summary:
+            # Local template fallback
+            ai_summary = (
+                f"Au total, cette période présente {galeries_pub} galeries publiques et {galeries_pri} galeries privées, "
+                f"regroupant {total_oeuvres} œuvres. Les galeries les plus vues sont {', '.join([g.nom for g in top_galeries[:3]])}.")
+
+        c.setFont('Helvetica', 11)
+        y = draw_wrapped_text(40, y, ai_summary, font_size=11, leading=15)
+        y -= 10
+
+        # Insert pie chart for public/private
+        pie_img = make_pie(galeries_pub, galeries_pri)
+        if pie_img:
+            c.drawImage(pie_img, width - 220, y - 160, width=160, height=160)
+
+        # Top galleries bar chart
+        gal_names = [g.nom for g in top_galeries]
+        gal_vals = [int(g.vues) for g in top_galeries]
+        gal_img = make_bar(gal_names, gal_vals, title='Top Galeries')
+        if gal_img:
+            c.drawImage(gal_img, 40, y - 200, width=width - 300, height=160)
+            y -= 200
+        else:
+            # fallback textual list
+            c.setFont('Helvetica-Bold', 12)
+            c.drawString(40, y, 'Top Galeries (vues)')
+            y -= 18
+            c.setFont('Helvetica', 10)
+            for g in top_galeries[:15]:
+                c.drawString(50, y, f"- {g.nom} : {g.vues}")
+                y -= 14
+                if y < 80:
+                    c.showPage()
+                    y = height - 40
+
+        # Per-item detailed paragraphs (top 5 galleries and top 5 oeuvres)
+        def generate_item_summaries_for_galleries(galeries_list):
+            summaries = []
+            try:
+                prompt = 'Génère pour chaque galerie ci-dessous une courte description en français (1-2 phrases) qui met en avant le thème, l\'ambiance et pourquoi elle attire des vues. Sépare chaque description par "###".\n\n'
+                for g in galeries_list[:10]:
+                    desc = g.description or ''
+                    theme = g.theme or ''
+                    owner = f"{g.proprietaire.prenom} {g.proprietaire.nom}" if getattr(g, 'proprietaire', None) else ''
+                    prompt += f"Galerie: {g.nom}\nDescription: {desc}\nThème: {theme}\nPropriétaire: {owner}\nVues: {g.vues}\n---\n"
+                text = generate_ai_text(prompt, max_tokens=800, temperature=0.7)
+                if text:
+                    parts = [p.strip() for p in text.split('###') if p.strip()]
+                    for i, g in enumerate(galeries_list[:len(parts)]):
+                        summaries.append(parts[i])
+            except Exception:
+                summaries = []
+
+            # fallback to simple template for any missing summaries
+            for i, g in enumerate(galeries_list[:5]):
+                if i < len(summaries):
+                    continue
+                desc = g.description or 'Aucune description fournie.'
+                theme = g.theme or 'Thème non spécifié.'
+                owner = f"{g.proprietaire.prenom} {g.proprietaire.nom}" if getattr(g, 'proprietaire', None) else 'Propriétaire inconnu.'
+                summaries.append(f"{g.nom} — {desc} Propriétaire: {owner}. Thème: {theme}. Vues: {g.vues}.")
+            return summaries
+
+        def generate_item_summaries_for_oeuvres(oeuvres_list):
+            summaries = []
+            try:
+                prompt = 'Génère pour chaque œuvre ci-dessous une courte description en français (1-2 phrases) qui décrit l\'œuvre, le style et pourquoi elle attire des vues. Sépare chaque description par "###".\n\n'
+                for o in oeuvres_list[:10]:
+                    desc = o.description or ''
+                    author = f"{o.auteur.prenom} {o.auteur.nom}" if getattr(o, 'auteur', None) else ''
+                    prompt += f"Oeuvre: {o.titre}\nDescription: {desc}\nAuteur: {author}\nVues: {o.vues}\n---\n"
+                text = generate_ai_text(prompt, max_tokens=800, temperature=0.7)
+                if text:
+                    parts = [p.strip() for p in text.split('###') if p.strip()]
+                    for i, o in enumerate(oeuvres_list[:len(parts)]):
+                        summaries.append(parts[i])
+            except Exception:
+                summaries = []
+
+            for i, o in enumerate(oeuvres_list[:5]):
+                if i < len(summaries):
+                    continue
+                desc = o.description or 'Aucune description fournie.'
+                author = f"{o.auteur.prenom} {o.auteur.nom}" if getattr(o, 'auteur', None) else 'Auteur inconnu.'
+                summaries.append(f"{o.titre} — {desc} Auteur: {author}. Vues: {o.vues}.")
+            return summaries
+
+        # Generate summaries
+        gallery_summaries = generate_item_summaries_for_galleries(list(top_galeries))
+        oeuvre_summaries = generate_item_summaries_for_oeuvres(list(top_oeuvres))
+
+        # Détails des galeries: description + render as a two-column grid of cards
+        y -= 10
+        # Section description (sanitized)
+        galeries_section_desc = sanitize_text(
+            "Cette section présente les galeries les plus visibles de la plateforme. Chaque carte contient le propriétaire, le thème, le nombre de vues et une courte description pour mieux comprendre pourquoi la galerie attire des visiteurs."
+        )
+        c.setFont('Helvetica', 10)
+        y = draw_wrapped_text(40, y, galeries_section_desc, font_size=10, leading=13, max_width=width - 80)
+        y -= 8
+        c.setFont('Helvetica-Bold', 12)
+        c.drawString(40, y, 'Détails des galeries')
+        y -= 18
+
+        cols = 2
+        gap = 12
+        card_w = (width - 80 - gap) / cols
+        card_h = 140
+        x_start = 40
+
+        c.setFont('Helvetica', 10)
+        galeries_to_show = list(top_galeries[:12])
+        for i, g in enumerate(galeries_to_show):
+            col = i % cols
+            row = i // cols
+            x = x_start + col * (card_w + gap)
+            y_row_top = y - row * (card_h + 16)
+
+            # Start a new page if this row would overflow
+            if y_row_top - card_h < 60:
+                c.showPage()
+                y = height - 40
+                row = 0
+                x = x_start + col * (card_w + gap)
+                y_row_top = y - row * (card_h + 16)
+
+            # Draw card border
+            c.setStrokeColor(colors.lightgrey)
+            c.rect(x, y_row_top - card_h, card_w, card_h, stroke=1, fill=0)
+
+            # Thumbnail: use the first artwork image from the gallery if available
+            thumb_w = 100
+            thumb_h = 100
+            thumb_x = x + 8
+            thumb_y = y_row_top - 12 - thumb_h
+            thumb = None
+            try:
+                first_oeuvre = g.oeuvres.first()
+                if first_oeuvre and getattr(first_oeuvre, 'image', None) and getattr(first_oeuvre.image, 'path', None):
+                    thumb = ImageReader(open(first_oeuvre.image.path, 'rb'))
+            except Exception:
+                thumb = None
+
+            if thumb:
+                try:
+                    c.drawImage(thumb, thumb_x, thumb_y, width=thumb_w, height=thumb_h, preserveAspectRatio=True, anchor='sw')
+                except Exception:
+                    thumb = None
+
+            # Text area
+            text_x = x + thumb_w + 18 if thumb else x + 12
+            text_y = y_row_top - 18
+            title = (g.nom or 'Sans nom')
+            owner = f"{g.proprietaire.prenom} {g.proprietaire.nom}" if getattr(g, 'proprietaire', None) else 'Propriétaire inconnu'
+            theme = g.theme or 'Thème non spécifié'
+            views = int(getattr(g, 'vues', 0) or 0)
+
+            # Title (wrapped and sanitized)
+            c.setFont('Helvetica-Bold', 11)
+            title_text = sanitize_text(title)
+            title_y = draw_wrapped_text(
+                text_x,
+                text_y,
+                title_text,
+                font_name='Helvetica-Bold',
+                font_size=11,
+                leading=13,
+                max_width=(card_w - (thumb_w + 36)) if thumb else (card_w - 24),
+            )
+
+            # Metadata line: owner • theme • vues (wrapped)
+            meta = f"Propriétaire: {owner} • Thème: {theme} • Vues: {views}"
+            meta = sanitize_text(meta)
+            c.setFont('Helvetica', 9)
+            meta_y = draw_wrapped_text(
+                text_x,
+                title_y,
+                meta,
+                font_name='Helvetica',
+                font_size=9,
+                leading=11,
+                max_width=(card_w - (thumb_w + 36)) if thumb else (card_w - 24),
+            )
+
+            # Description (use generated summary if available), sanitized and wrapped
+            desc_idx = i if i < len(gallery_summaries) else None
+            raw_desc = gallery_summaries[desc_idx] if desc_idx is not None else (g.description or 'Aucune description fournie.')
+            desc_text = sanitize_text(raw_desc)
+            c.setFont('Helvetica', 9)
+            _ = draw_wrapped_text(
+                text_x,
+                meta_y,
+                desc_text,
+                font_name='Helvetica',
+                font_size=9,
+                leading=11,
+                max_width=(card_w - (thumb_w + 36)) if thumb else (card_w - 24),
+            )
+
+        # Adjust y after grid
+        rows_drawn = (len(galeries_to_show) + cols - 1) // cols
+        y = y - rows_drawn * (card_h + 16) - 20
+
+        # (Removed) per-œuvre paragraph list — to keep report concise we list top œuvres in the 'Top Œuvres' section below.
+
+        # Next page: Top Œuvres displayed as a two-column grid of cards
+        c.showPage()
+        y = height - 40
+        c.setFont('Helvetica-Bold', 14)
+        c.drawString(40, y, 'Top Œuvres')
+        y -= 24
+
+        cols = 2
+        gap = 12
+        card_w = (width - 80 - gap) / cols
+        card_h = 140
+        x_start = 40
+
+        c.setFont('Helvetica', 10)
+        oeuvres_to_show = list(top_oeuvres[:12])
+        for i, o in enumerate(oeuvres_to_show):
+            col = i % cols
+            row = i // cols
+            x = x_start + col * (card_w + gap)
+            y_row_top = y - row * (card_h + 16)
+
+            # Start a new page if this row would overflow
+            if y_row_top - card_h < 60:
+                c.showPage()
+                y = height - 40
+                row = 0
+                x = x_start + col * (card_w + gap)
+                y_row_top = y - row * (card_h + 16)
+
+            # Draw card border
+            c.setStrokeColor(colors.lightgrey)
+            c.rect(x, y_row_top - card_h, card_w, card_h, stroke=1, fill=0)
+
+            # Thumbnail (left side)
+            thumb_w = 100
+            thumb_h = 100
+            thumb_x = x + 8
+            thumb_y = y_row_top - 12 - thumb_h
+            thumb = None
+            try:
+                if getattr(o, 'image', None) and getattr(o.image, 'path', None):
+                    thumb = ImageReader(open(o.image.path, 'rb'))
+            except Exception:
+                thumb = None
+
+            if thumb:
+                try:
+                    c.drawImage(thumb, thumb_x, thumb_y, width=thumb_w, height=thumb_h, preserveAspectRatio=True, anchor='sw')
+                except Exception:
+                    thumb = None
+
+            # Text area (right side)
+            text_x = x + thumb_w + 18 if thumb else x + 12
+            text_y = y_row_top - 18
+            title = (o.titre or 'Sans titre')
+            author = f"{o.auteur.prenom} {o.auteur.nom}" if getattr(o, 'auteur', None) else 'Auteur inconnu'
+            views = int(getattr(o, 'vues', 0) or 0)
+
+            c.setFont('Helvetica-Bold', 11)
+            c.drawString(text_x, text_y, title[:60])
+            text_y -= 14
+            c.setFont('Helvetica', 9)
+            c.drawString(text_x, text_y, f"Auteur: {author} • Vues: {views}")
+            text_y -= 12
+
+            # Description paragraph (use generated summaries if available)
+            desc_idx = i if i < len(oeuvre_summaries) else None
+            desc_text = oeuvre_summaries[desc_idx] if desc_idx is not None else (o.description or 'Aucune description fournie.')
+            # Wrap description within card text area
+            max_desc_width = card_w - (thumb_w + 36) if thumb else card_w - 24
+            # Use a small helper to draw wrapped text at (text_x, text_y)
+            def _draw_desc(xpos, ypos, text_val):
+                nonlocal c
+                c.setFont('Helvetica', 9)
+                words = text_val.split()
+                line = ''
+                cur_y = ypos
+                for w in words:
+                    test = (line + ' ' + w).strip()
+                    if c.stringWidth(test, 'Helvetica', 9) > max_desc_width:
+                        c.drawString(xpos, cur_y, line)
+                        cur_y -= 12
+                        line = w
+                    else:
+                        line = test
+                if line:
+                    c.drawString(xpos, cur_y, line)
+                    cur_y -= 12
+                return cur_y
+
+            _draw_desc(text_x, text_y, desc_text)
+
+        # Move y down past the grid we just drew
+        rows_drawn = (len(oeuvres_to_show) + cols - 1) // cols
+        y = y - rows_drawn * (card_h + 16) - 20
+
+        # Artists bar chart (kept below)
+        artist_labels = [f"{a.prenom} {a.nom}" for a in artists_qs[:12]]
+        artist_values = [int(getattr(a, 'total_views') or 0) for a in artists_qs[:12]]
+        artist_img = make_bar(artist_labels, artist_values, title='Top Artistes', max_items=12)
+        if artist_img:
+            # Ensure we have space, otherwise new page
+            if y - 240 < 60:
+                c.showPage()
+                y = height - 40
+            c.drawImage(artist_img, 40, y - 220, width=width - 80, height=220)
+
+        c.save()
+
+        # write buffer to file
+        with open(pdf_path, 'wb') as f:
+            f.write(buffer.getvalue())
+
+        # If caller requested immediate download, return file as attachment
+        try_download = False
+        try:
+            # support both JSON body and form params
+            try_download = bool(request.data.get('download'))
+        except Exception:
+            try_download = str(request.GET.get('download', '')).lower() in ('1', 'true', 'yes')
+
+        if try_download:
+            # stream the file back
+            return FileResponse(open(pdf_path, 'rb'), as_attachment=True, filename=pdf_filename, content_type='application/pdf')
+
+        # otherwise return an absolute URL so the frontend opens the correct backend host
+        report_url = request.build_absolute_uri(settings.MEDIA_URL + 'reports/' + pdf_filename)
+        return JsonResponse({'report_url': report_url})
+
+    except Exception as e:
+        # fallback: write text summary instead and return txt url
+        txt_filename = f"dashboard_summary_{filename_ts}.txt"
+        txt_path = os.path.join(reports_dir, txt_filename)
+        with open(txt_path, 'w', encoding='utf-8') as f:
+            f.write('\n'.join(summary_lines))
+
+        # If download requested, stream the text file
+        try_download = False
+        try:
+            try_download = bool(request.data.get('download'))
+        except Exception:
+            try_download = str(request.GET.get('download', '')).lower() in ('1', 'true', 'yes')
+
+        if try_download:
+            return FileResponse(open(txt_path, 'rb'), as_attachment=True, filename=txt_filename, content_type='text/plain')
+
+        report_url = request.build_absolute_uri(settings.MEDIA_URL + 'reports/' + txt_filename)
+        return JsonResponse({'report_url': report_url, 'warning': str(e)})
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def views_by_artist(request):
+    """Return aggregated views per artist (sum of their oeuvres.vues + galeries.vues).
+
+    Query params:
+      - top (int, default=10): return only top N artists by total views
+      - artists_only (bool, default=true): restrict to users with role='artiste'
+      - include_zero (bool, default=false): include artists with zero total views
+
+    Response: { labels: [...], values: [...] }
+    """
+    try:
+        top = int(request.query_params.get('top', 10))
+    except Exception:
+        top = 10
+    artists_only = str(request.query_params.get('artists_only', 'true')).lower() in ('1', 'true', 'yes')
+    include_zero = str(request.query_params.get('include_zero', 'false')).lower() in ('1', 'true', 'yes')
+
+    from django.db.models import Sum, F
+    from django.db.models.functions import Coalesce
+
+    qs = Utilisateur.objects.all()
+    if artists_only:
+        qs = qs.filter(role='artiste')
+
+    # Annotate sums of related vues and compute a total
+    qs = qs.annotate(
+        total_oeuvre_views=Coalesce(Sum('oeuvres__vues'), 0),
+        total_galerie_views=Coalesce(Sum('galeries__vues'), 0),
+    ).annotate(total_views=F('total_oeuvre_views') + F('total_galerie_views')).order_by('-total_views')
+
+    if not include_zero:
+        qs = qs.filter(total_views__gt=0)
+
+    # Limit to top N
+    qs = qs[:top]
+
+    labels = []
+    values = []
+    for u in qs:
+        labels.append(f"{u.prenom} {u.nom}")
+        values.append(int(getattr(u, 'total_views') or 0))
+
+    return Response({'labels': labels, 'values': values})

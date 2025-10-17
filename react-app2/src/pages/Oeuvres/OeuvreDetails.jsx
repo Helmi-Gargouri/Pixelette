@@ -450,6 +450,13 @@ const OeuvreDetails = () => {
                         </h6>
                       </div>
                     </li>
+                    <li>
+                      <div className="icon"><i className="fas fa-eye"></i></div>
+                      <div className="media-body">
+                        <span className="title">Vues:</span>
+                        <h6>{oeuvre.vues || 0}</h6>
+                      </div>
+                    </li>
                     {auteur && auteur.email && (
                       <li>
                         <div className="icon"><i className="fas fa-envelope"></i></div>
