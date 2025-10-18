@@ -119,6 +119,78 @@ class Statistique(models.Model):
     def __str__(self):
         return f"Statistiques pour {self.oeuvre} le {self.date}"
     
+class Suivi(models.Model):
+    """Modèle pour gérer les suivis entre utilisateurs et artistes"""
+    utilisateur = models.ForeignKey(
+        Utilisateur, 
+        on_delete=models.CASCADE, 
+        related_name='suivis',
+        verbose_name="Utilisateur qui suit"
+    )
+    artiste = models.ForeignKey(
+        Utilisateur, 
+        on_delete=models.CASCADE, 
+        related_name='abonnes',
+        verbose_name="Artiste suivi",
+        limit_choices_to={'role': 'artiste'}
+    )
+    date_suivi = models.DateTimeField(auto_now_add=True, verbose_name="Date de suivi")
+    
+    class Meta:
+        unique_together = ['utilisateur', 'artiste']
+        verbose_name = "Suivi"
+        verbose_name_plural = "Suivis"
+        ordering = ['-date_suivi']
+    
+    def __str__(self):
+        return f"{self.utilisateur.prenom} suit {self.artiste.prenom}"
+
+    def save(self, *args, **kwargs):
+        # Empêcher qu'un utilisateur se suive lui-même
+        if self.utilisateur == self.artiste:
+            raise ValueError("Un utilisateur ne peut pas se suivre lui-même")
+        
+        # Vérifier que l'artiste a bien le rôle 'artiste'
+        if self.artiste.role != 'artiste':
+            raise ValueError("Vous ne pouvez suivre que des artistes")
+        
+        is_new = self.pk is None
+        super().save(*args, **kwargs)
+        
+        # Envoyer un email à l'artiste si c'est un nouveau suivi
+        if is_new:
+            self.send_notification_email()
+    
+    def send_notification_email(self):
+        """Envoie un email à l'artiste pour l'informer du nouveau follower"""
+        subject = f'🎨 {self.utilisateur.prenom} {self.utilisateur.nom} a commencé à vous suivre !'
+        message = f"""Bonjour {self.artiste.prenom},
+
+Bonne nouvelle ! {self.utilisateur.prenom} {self.utilisateur.nom} a commencé à suivre votre travail sur Pixelette.
+
+Profil du follower :
+- Nom : {self.utilisateur.prenom} {self.utilisateur.nom}
+- Email : {self.utilisateur.email}
+- Membre depuis : {self.utilisateur.date_inscription.strftime('%d/%m/%Y')}
+
+Continuez à créer et partager vos magnifiques œuvres pour inspirer votre communauté grandissante ! 🎨✨
+
+Connectez-vous pour voir tous vos abonnés : http://localhost:5173/profil
+
+Cordialement,
+L'équipe Pixelette
+        """
+        
+        try:
+            send_mail(
+                subject,
+                message,
+                'noreply.pixelette@gmail.com',
+                [self.artiste.email],
+                fail_silently=False,
+            )
+        except Exception as e:
+            print(f"❌ Erreur envoi email suivi: {str(e)}")
 
 class DemandeRole(models.Model):
     STATUT_CHOICES = [
