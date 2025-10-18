@@ -72,15 +72,46 @@ const TwoFactorAuth = () => {
 
     // Passer au champ suivant si un chiffre est saisi
     if (value !== "" && index < 5) {
-      inputRefs.current[index + 1].focus();
+      setTimeout(() => {
+        inputRefs.current[index + 1]?.focus();
+      }, 10);
     }
   };
 
   const handleKeyDown = (index, e) => {
     // Gérer la touche retour arrière
-    if (e.key === 'Backspace' && verificationCode[index] === '' && index > 0) {
-      inputRefs.current[index - 1].focus();
+    if (e.key === 'Backspace') {
+      if (verificationCode[index] === '' && index > 0) {
+        // Si le champ est vide, aller au champ précédent
+        setTimeout(() => {
+          inputRefs.current[index - 1]?.focus();
+        }, 10);
+      } else if (verificationCode[index] !== '') {
+        // Si le champ contient un chiffre, le vider d'abord
+        const newCode = [...verificationCode];
+        newCode[index] = '';
+        setVerificationCode(newCode);
+      }
     }
+    
+    // Gérer les flèches pour naviguer
+    if (e.key === 'ArrowLeft' && index > 0) {
+      e.preventDefault();
+      setTimeout(() => {
+        inputRefs.current[index - 1]?.focus();
+      }, 10);
+    }
+    
+    if (e.key === 'ArrowRight' && index < 5) {
+      e.preventDefault();
+      setTimeout(() => {
+        inputRefs.current[index + 1]?.focus();
+      }, 10);
+    }
+  };
+
+  const handleFocus = (e) => {
+    e.target.select();
   };
 
   const handlePaste = (e) => {
@@ -97,11 +128,12 @@ const TwoFactorAuth = () => {
     
     setVerificationCode(newCode);
     
-    // Focus sur le dernier champ rempli ou le premier vide
-    const firstEmptyIndex = newCode.findIndex(code => code === '');
-    const focusIndex = firstEmptyIndex === -1 ? 5 : firstEmptyIndex;
-    if (inputRefs.current[focusIndex]) {
-      inputRefs.current[focusIndex].focus();
+    // Focus sur le dernier champ rempli
+    const lastFilledIndex = digits.length - 1;
+    if (lastFilledIndex < 5) {
+      setTimeout(() => {
+        inputRefs.current[lastFilledIndex + 1]?.focus();
+      }, 10);
     }
   };
 
@@ -157,7 +189,9 @@ const TwoFactorAuth = () => {
       
       // Réinitialiser le code en cas d'erreur
       setVerificationCode(["", "", "", "", "", ""]);
-      inputRefs.current[0].focus();
+      setTimeout(() => {
+        inputRefs.current[0]?.focus();
+      }, 10);
     }
   };
 
@@ -221,7 +255,6 @@ const TwoFactorAuth = () => {
                             <input
                               key={index}
                               ref={el => inputRefs.current[index] = el}
-                              className="form-control text-center"
                               type="text"
                               inputMode="numeric"
                               pattern="[0-9]*"
@@ -229,12 +262,31 @@ const TwoFactorAuth = () => {
                               value={digit}
                               onChange={(e) => handleInputChange(index, e.target.value)}
                               onKeyDown={(e) => handleKeyDown(index, e)}
-                              onPaste={index === 0 ? handlePaste : undefined}
+                              onFocus={handleFocus}
+                              onPaste={handlePaste}
                               style={{
                                 width: '50px',
                                 height: '60px',
                                 fontSize: '1.5rem',
-                                fontWeight: 'bold'
+                                fontWeight: 'bold',
+                                textAlign: 'center',
+                                color: '#000000',
+                                backgroundColor: '#ffffff',
+                                border: '2px solid #dee2e6',
+                                borderRadius: '8px',
+                                padding: '0',
+                                margin: '0',
+                                display: 'block',
+                                outline: 'none',
+                                transition: 'border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out'
+                              }}
+                              onFocus={(e) => {
+                                e.target.style.borderColor = '#86b7fe';
+                                e.target.style.boxShadow = '0 0 0 0.25rem rgba(13, 110, 253, 0.25)';
+                              }}
+                              onBlur={(e) => {
+                                e.target.style.borderColor = '#dee2e6';
+                                e.target.style.boxShadow = 'none';
                               }}
                               required
                             />
