@@ -564,6 +564,71 @@ class OeuvreViewSet(viewsets.ModelViewSet):
 
         predicted = int(base * mult)
 
+        # Ensure we don't predict fewer views than the oeuvre already has.
+        # Use the current oeuvre.vues as a floor and also consider a growth-based
+        # estimate from the current value when available.
+        try:
+            current_views = int(getattr(oeuvre, 'vues') or 0)
+        except Exception:
+            current_views = 0
+
+        if current_views > 0:
+            # growth-based estimate from current observed views
+            predicted_from_current = max(int(current_views * mult), current_views)
+        else:
+            predicted_from_current = 0
+
+        predicted = max(predicted, predicted_from_current, 1)
+
+        # --- Month-based estimation using daily `Statistique` records ---
+        try:
+            today_date = timezone.now().date()
+            day_30_ago = today_date - datetime.timedelta(days=30)
+
+            # Aggregate last 30 days of recorded vues for this oeuvre
+            last_30_qs = Statistique.objects.filter(oeuvre=oeuvre, date__gte=day_30_ago)
+            last_30_views = int(last_30_qs.aggregate(total=Coalesce(Sum('vues'), 0))['total'] or 0)
+            days_with_stats = last_30_qs.values('date').distinct().count() or 0
+            avg_daily_last_30 = (last_30_views / days_with_stats) if days_with_stats else 0.0
+
+            # Compare recent 7-day window with previous 7-day window to estimate trend
+            day_7_ago = today_date - datetime.timedelta(days=7)
+            day_14_ago = today_date - datetime.timedelta(days=14)
+
+            last7 = int(Statistique.objects.filter(oeuvre=oeuvre, date__gte=day_7_ago).aggregate(total=Coalesce(Sum('vues'), 0))['total'] or 0)
+            prev7 = int(Statistique.objects.filter(oeuvre=oeuvre, date__gte=day_14_ago, date__lt=day_7_ago).aggregate(total=Coalesce(Sum('vues'), 0))['total'] or 0)
+
+            avg7_last = last7 / 7.0
+            avg7_prev = (prev7 / 7.0) if prev7 else None
+
+            if avg7_prev and avg7_prev > 0:
+                trend = avg7_last / max(avg7_prev, 1e-6)
+            else:
+                # If we don't have a previous window, use 1.0 (stable)
+                trend = 1.0
+
+            # Clamp trend so extreme spikes don't produce unrealistic predictions
+            growth_factor = max(0.7, min(trend, 1.5))
+
+            # Predict next 30 days from recent daily average and trend
+            predicted_next_30 = int(round(avg_daily_last_30 * 30 * growth_factor)) if days_with_stats else predicted
+
+            # Ensure floor at current_views
+            try:
+                current_views = int(getattr(oeuvre, 'vues') or 0)
+            except Exception:
+                current_views = 0
+            predicted_next_30 = max(predicted_next_30, current_views, 1)
+
+            # Adjust confidence: more data (days_with_stats) increases confidence
+            confidence = int(min(98, confidence + min(30, days_with_stats)))
+        except Exception:
+            # If anything fails, fall back to earlier heuristic
+            last_30_views = 0
+            avg_daily_last_30 = 0.0
+            trend = 1.0
+            predicted_next_30 = predicted
+
         # Confidence roughly based on amount of information
         confidence = min(95, 40 + (desc_len / 1000) * 40 + (20 if image_present else 0))
 
@@ -853,6 +918,134 @@ class GalerieViewSet(viewsets.ModelViewSet):
             {'error': 'Vous n\'avez pas accès à cette galerie privée'},
             status=status.HTTP_403_FORBIDDEN
         )
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
+    def predict_popularity(self, request, pk=None):
+        """Predict popularity for a gallery by aggregating its artworks' recent stats
+
+        Mirrors the lightweight heuristic used for individual oeuvres but operates
+        at the gallery level (summing Statistique rows for oeuvres in the gallery)
+        and returns both a heuristic predicted_views and a 30-day forecast derived
+        from recent Statistique records when available.
+        """
+        try:
+            galerie = self.get_object()
+        except Exception:
+            return Response({'error': 'Galerie not found'}, status=404)
+
+        from django.db.models import Avg, Sum
+        from django.db.models.functions import Coalesce
+
+        try:
+            avg_views = Galerie.objects.aggregate(avg=Coalesce(Avg('vues'), 0))['avg'] or 0
+        except Exception:
+            avg_views = 0
+
+        base = max(int(avg_views), 1)
+
+        desc = (galerie.description or '')
+        desc_len = len(desc)
+        # Image presence: any oeuvre with an image
+        try:
+            image_present = galerie.oeuvres.filter(image__isnull=False).exclude(image='').exists()
+        except Exception:
+            image_present = False
+
+        title_len = len((galerie.nom or ''))
+
+        mult = 1.0
+        if image_present:
+            mult += 0.2
+        mult += min(0.5, desc_len / 4000)
+        mult += min(0.2, title_len / 200)
+
+        predicted = int(base * mult)
+
+        try:
+            current_views = int(getattr(galerie, 'vues') or 0)
+        except Exception:
+            current_views = 0
+
+        if current_views > 0:
+            predicted_from_current = max(int(current_views * mult), current_views)
+        else:
+            predicted_from_current = 0
+
+        predicted = max(predicted, predicted_from_current, 1)
+
+        # Month-based estimation using Statistique rows for oeuvres in this gallery
+        try:
+            today_date = timezone.now().date()
+            day_30_ago = today_date - datetime.timedelta(days=30)
+
+            last_30_qs = Statistique.objects.filter(oeuvre__in=galerie.oeuvres.all(), date__gte=day_30_ago)
+            last_30_views = int(last_30_qs.aggregate(total=Coalesce(Sum('vues'), 0))['total'] or 0)
+            days_with_stats = last_30_qs.values('date').distinct().count() or 0
+            avg_daily_last_30 = (last_30_views / days_with_stats) if days_with_stats else 0.0
+
+            day_7_ago = today_date - datetime.timedelta(days=7)
+            day_14_ago = today_date - datetime.timedelta(days=14)
+
+            last7 = int(Statistique.objects.filter(oeuvre__in=galerie.oeuvres.all(), date__gte=day_7_ago).aggregate(total=Coalesce(Sum('vues'), 0))['total'] or 0)
+            prev7 = int(Statistique.objects.filter(oeuvre__in=galerie.oeuvres.all(), date__gte=day_14_ago, date__lt=day_7_ago).aggregate(total=Coalesce(Sum('vues'), 0))['total'] or 0)
+
+            avg7_last = last7 / 7.0
+            avg7_prev = (prev7 / 7.0) if prev7 else None
+
+            if avg7_prev and avg7_prev > 0:
+                trend = avg7_last / max(avg7_prev, 1e-6)
+            else:
+                trend = 1.0
+
+            growth_factor = max(0.7, min(trend, 1.5))
+
+            predicted_next_30 = int(round(avg_daily_last_30 * 30 * growth_factor)) if days_with_stats else predicted
+            predicted_next_30 = max(predicted_next_30, current_views, 1)
+
+            # Build a conservative confidence estimate
+            confidence = int(min(95, 35 + (desc_len / 1000.0) * 30 + (20 if image_present else 0) + min(20, days_with_stats)))
+        except Exception:
+            last_30_views = 0
+            avg_daily_last_30 = 0.0
+            trend = 1.0
+            predicted_next_30 = predicted
+            confidence = int(min(95, 35 + (desc_len / 1000.0) * 30 + (20 if image_present else 0)))
+
+        tips = []
+        if not image_present:
+            tips.append('Ajoutez des images attractives pour les œuvres de la galerie — le visuel attire davantage de visiteurs.')
+        if desc_len < 200:
+            tips.append('Rédigez une description de galerie plus détaillée (inspiration, thème, artistes) pour aider la découverte.')
+        tips.append('Partagez la galerie sur les réseaux et créez des collections thématiques pour améliorer la visibilité.')
+
+        ai_advice = None
+        try:
+            prompt = (
+                f"You are an art marketing assistant. Given the following gallery data, estimate a reasonable monthly view count and give 4 concise suggestions to improve visibility:\n"
+                f"Gallery: {galerie.nom}\n"
+                f"Description: {desc}\n"
+                f"Number of works: {galerie.oeuvres.count()}\n"
+                f"Typical platform average gallery views: {avg_views}\n"
+            )
+            ai_text = generate_ai_text(prompt, max_tokens=250, temperature=0.7)
+            if ai_text:
+                ai_advice = ai_text
+                tips.insert(0, ai_text)
+        except Exception:
+            ai_advice = None
+
+        result = {
+            'predicted_views': predicted,
+            'predicted_next_30': predicted_next_30,
+            'last_30_views': last_30_views,
+            'avg_daily_last_30': avg_daily_last_30,
+            'trend': trend,
+            'confidence': int(confidence),
+            'tips': tips,
+            'ai_advice': ai_advice
+        }
+
+        return Response(result)
     
     def update(self, request, *args, **kwargs):
         partial = kwargs.pop('partial', False)
@@ -1070,6 +1263,18 @@ class SavedStatViewSet(viewsets.ModelViewSet):
             stat = self.get_object()
         except Exception as e:
             return Response({'error': 'SavedStat not found or other error', 'detail': str(e)}, status=404)
+
+        # If this SavedStat was created from an AI-generated chart and contains
+        # precomputed data in config['ai_raw'], return that directly.
+        try:
+            if stat.config and isinstance(stat.config, dict) and stat.config.get('ai_raw'):
+                raw = stat.config.get('ai_raw') or {}
+                labels = raw.get('labels') or []
+                values = raw.get('values') or []
+                return Response({'labels': labels, 'values': values})
+        except Exception:
+            # If anything goes wrong with ai_raw handling, fall back to normal compute
+            pass
 
         # Map subject to model
         mapping = {
@@ -2058,6 +2263,285 @@ def generate_summary_pdf(request):
             'warning': 'PDF generation failed, text report provided',
             'error': str(e)
         })
+
+
+@api_view(['POST'])
+@permission_classes([IsAdminOrSession])
+def ai_generate_chart(request):
+    """Interpret a French prompt and return a computed chart dataset.
+
+    Expected request JSON: { prompt: "..." }
+    Response JSON (success): {
+      success: true,
+      chart_type: 'pie'|'bar'|'line'|'radialbar',
+      title: 'Titre',
+      labels: [...],
+      values: [...],
+      explanation: '...' (optional)
+    }
+    If data cannot be produced: { success: false, message: '...' }
+    """
+    try:
+        payload = request.data or {}
+        prompt = (payload.get('prompt') or '').strip()
+        if not prompt:
+            return Response({'success': False, 'message': 'Veuillez fournir une description (en français).'}, status=400)
+
+        # Simple heuristic parsing (French keywords)
+        p = prompt.lower()
+        chart_type = 'pie'
+        if any(k in p for k in ['bar', 'barres', 'histogramme', 'barras']):
+            chart_type = 'bar'
+        elif any(k in p for k in ['ligne', 'courbe', 'line']):
+            chart_type = 'line'
+        elif any(k in p for k in ['radial', 'radialbar']):
+            chart_type = 'radialbar'
+        elif any(k in p for k in ['donut', 'anneau', 'donut']):
+            chart_type = 'donut'
+        else:
+            # default heuristic: pie for distributions
+            chart_type = 'pie'
+
+        # What to measure: look for 'vues', 'visites', 'likes' etc.
+        subject = None
+        if 'vues' in p or 'visites' in p:
+            subject = 'vues'
+        elif 'likes' in p or 'j\'aime' in p:
+            subject = 'likes'
+        else:
+            # default to vues
+            subject = 'vues'
+
+        # Grouping target
+        target = None
+        if 'utilisateur' in p or 'utilisateurs' in p or 'auteur' in p or 'artiste' in p:
+            target = 'utilisateur'
+        elif 'oeuvre' in p or 'œuvre' in p or 'oeuvres' in p:
+            target = 'oeuvre'
+        elif 'galerie' in p or 'galeries' in p:
+            target = 'galerie'
+        elif 'global' in p or 'total' in p or 'overall' in p:
+            target = 'global'
+        else:
+            # If user asked for 'par' pattern like 'vues par utilisateur'
+            if 'par utilisateur' in p or 'par auteur' in p:
+                target = 'utilisateur'
+            elif 'par galerie' in p:
+                target = 'galerie'
+            elif 'par oeuvre' in p or 'par œuvre' in p:
+                target = 'oeuvre'
+
+        # Limit items (top N)
+        # Default from payload or 10
+        try:
+            limit = int(payload.get('limit') or 10)
+        except Exception:
+            limit = 10
+
+        # Try to parse a 'top N' from the French prompt itself, e.g. "top 2", "les 5 premiers", "2 meilleures"
+        try:
+            import re
+            m = re.search(r"\btop\s*(\d{1,3})\b", p)
+            if not m:
+                m = re.search(r"\b(?:les\s+)?(\d{1,3})\s*(?:premier|première|premiers|premières|meilleur|meilleurs|meilleure|meilleures)\b", p)
+            if m:
+                parsed_n = int(m.group(1))
+                # sanity bounds
+                if 1 <= parsed_n <= 100:
+                    limit = parsed_n
+        except Exception:
+            # ignore parsing failures and keep the earlier limit
+            pass
+
+        # Compute the data using ORM
+        from django.db.models import Sum
+        from django.db.models.functions import Coalesce
+
+    # Advanced parsing: detect 'compare' requests and 'group by field' like 'par thème'
+        group_field = None
+        # If both galerie and oeuvre are mentioned and user asks to compare, treat as global comparison
+        if ('galerie' in p or 'galeries' in p) and ('oeuvre' in p or 'œuvre' in p or 'oeuvres' in p) and any(k in p for k in ['compar', 'vs', 'vs.', 'vs/', ' vs ', 'contre', ' vs', 'vs ' , ' vs.']):
+            target = 'global'
+
+        # Detect 'par thème' or similar grouping requests for oeuvres
+        if 'par thème' in p or 'par theme' in p or 'par catégorie' in p or 'par categorie' in p or 'par tag' in p:
+            target = 'group_oeuvre_field'
+            group_field = 'theme'
+
+        # Detect generic 'répartition des' requests, attempt to set grouping by the following token
+        if 'répartition des' in p or 'répartition de' in p:
+            # leave prior group_field if set; otherwise try simple heuristic
+            if not group_field and 'par' in p:
+                # e.g. 'répartition des œuvres par thème' -> set group_field
+                try:
+                    import re
+                    m = re.search(r"répartition(?: des| de)? [\w\s']+ par (\w+)", p)
+                    if m:
+                        gf = m.group(1)
+                        # normalize french 'thème' without accent
+                        if gf.startswith('theme') or gf.startswith('thème'):
+                            group_field = 'theme'
+                            target = 'group_oeuvre_field'
+                except Exception:
+                    pass
+
+        if target == 'utilisateur':
+            # Sum of oeuvres.vues + galeries.vues per user
+            qs = Utilisateur.objects.annotate(
+                total_oeuvre_views=Coalesce(Sum('oeuvres__vues'), 0),
+                total_galerie_views=Coalesce(Sum('galeries__vues'), 0)
+            ).annotate(total_views=F('total_oeuvre_views') + F('total_galerie_views')).order_by('-total_views')[:limit]
+
+            labels = [f"{u.prenom} {u.nom}" for u in qs]
+            values = [int(getattr(u, 'total_views') or 0) for u in qs]
+            title = f"Vues par artiste/utilisateur (top {len(labels)})"
+
+        elif target == 'galerie':
+            qs = Galerie.objects.order_by('-vues')[:limit]
+            labels = [g.nom for g in qs]
+            values = [int(g.vues or 0) for g in qs]
+            title = f"Vues par galerie (top {len(labels)})"
+
+        elif target == 'oeuvre':
+            qs = Oeuvre.objects.order_by('-vues')[:limit]
+            labels = [o.titre for o in qs]
+            values = [int(o.vues or 0) for o in qs]
+            title = f"Vues par œuvre (top {len(labels)})"
+        elif 'saison' in p or 'saisons' in p:
+            # Group creations by season (radar chart)
+            try:
+                from django.db.models.functions import ExtractMonth
+                from django.db.models import Count
+
+                # Count oeuvres per month and map to seasons
+                month_counts = {m: 0 for m in range(1, 13)}
+                qs_month = Oeuvre.objects.annotate(month=ExtractMonth('date_creation')).values('month').annotate(cnt=Count('id'))
+                for row in qs_month:
+                    mm = row.get('month') or 0
+                    if mm and 1 <= mm <= 12:
+                        month_counts[int(mm)] = int(row.get('cnt') or 0)
+
+                # Map months to French seasons
+                seasons_map = {
+                    'Printemps': [3, 4, 5],
+                    'Été': [6, 7, 8],
+                    'Automne': [9, 10, 11],
+                    'Hiver': [12, 1, 2]
+                }
+                labels = list(seasons_map.keys())
+                values = []
+                for season, months in seasons_map.items():
+                    ssum = sum(month_counts.get(m, 0) for m in months)
+                    values.append(int(ssum))
+
+                chart_type = 'radar'
+                title = f"Créations de contenu par saison ({sum(values)} créations)"
+            except Exception:
+                # Fallback to global if something goes wrong
+                total_galeries_views = Galerie.objects.aggregate(total=Coalesce(Sum('vues'), 0))['total'] or 0
+                total_oeuvres_views = Oeuvre.objects.aggregate(total=Coalesce(Sum('vues'), 0))['total'] or 0
+                labels = ['Galeries', 'Œuvres']
+                values = [int(total_galeries_views), int(total_oeuvres_views)]
+                title = 'Vues globales (galeries vs œuvres)'
+
+        elif any(k in p for k in ['engagement', 'métriques', 'metrics', 'métrique', 'interactions']):
+            # Build a multi-series bar chart showing multiple engagement metrics across top entities
+            try:
+                from django.db.models import Count
+
+                # Choose target entities (galeries by default)
+                label_qs = None
+                if 'par utilisateur' in p or 'par auteur' in p or 'par artiste' in p:
+                    label_qs = Utilisateur.objects.annotate(total_views=Coalesce(Sum('oeuvres__vues'), 0)).order_by('-total_views')[:limit]
+                    labels = [f"{u.prenom} {u.nom}" for u in label_qs]
+                    # series: vues, nombre d'œuvres
+                    vues_series = [int(getattr(u, 'total_views') or 0) for u in label_qs]
+                    oeuvres_series = [int(u.oeuvres.count() if hasattr(u, 'oeuvres') else 0) for u in label_qs]
+                    series = [
+                        {'name': 'Vues', 'data': vues_series},
+                        {'name': 'Œuvres', 'data': oeuvres_series}
+                    ]
+                else:
+                    # default: per galerie
+                    label_qs = Galerie.objects.annotate(total_oeuvre_views=Coalesce(Sum('oeuvres__vues'), 0), oeuvres_count=Coalesce(Count('oeuvres'), 0)).order_by('-total_oeuvre_views')[:limit]
+                    labels = [g.nom for g in label_qs]
+                    vues_series = [int(getattr(g, 'total_oeuvre_views') or 0) for g in label_qs]
+                    oeuvres_series = [int(getattr(g, 'oeuvres_count') or 0) for g in label_qs]
+                    series = [
+                        {'name': 'Vues (œuvres)', 'data': vues_series},
+                        {'name': 'Nombre d\'œuvres', 'data': oeuvres_series}
+                    ]
+
+                chart_type = 'bar'
+                title = f"Métriques d'engagement ({len(labels)} éléments)"
+                # Return 'series' key for multi-series charts
+                return Response({
+                    'success': True,
+                    'chart_type': chart_type,
+                    'title': title,
+                    'labels': labels,
+                    'series': series,
+                    'explanation': f"Généré à partir du prompt: {prompt}"
+                })
+            except Exception:
+                # fallback to global
+                total_galeries_views = Galerie.objects.aggregate(total=Coalesce(Sum('vues'), 0))['total'] or 0
+                total_oeuvres_views = Oeuvre.objects.aggregate(total=Coalesce(Sum('vues'), 0))['total'] or 0
+                labels = ['Galeries', 'Œuvres']
+                values = [int(total_galeries_views), int(total_oeuvres_views)]
+                title = 'Vues globales (galeries vs œuvres)'
+        elif target == 'group_oeuvre_field' and group_field:
+            # Group oeuvres by a specific field. If grouping by 'theme', aggregate via Galerie.theme
+            try:
+                from django.db.models import Count
+                if group_field == 'theme':
+                    # Oeuvre has no 'theme' field; use Galerie.theme and aggregate views of oeuvres related to galleries
+                    # Sum vues of oeuvres per gallery theme
+                    agg = Galerie.objects.values('theme').annotate(total_vues=Coalesce(Sum('oeuvres__vues'), 0)).order_by('-total_vues')[:limit]
+                    labels = [row.get('theme') or 'Sans thème' for row in agg]
+                    values = [int(row.get('total_vues') or 0) for row in agg]
+                    title = f"Répartition des œuvres par thème (top {len(labels)})"
+                else:
+                    # For other fields that may exist on Oeuvre, try summing vues first
+                    agg = Oeuvre.objects.values(group_field).annotate(total_vues=Coalesce(Sum('vues'), 0)).order_by('-total_vues')[:limit]
+                    labels = [row.get(group_field) or 'Sans valeur' for row in agg]
+                    values = [int(row.get('total_vues') or 0) for row in agg]
+                    title = f"Répartition des œuvres par {group_field} (top {len(labels)})"
+            except Exception:
+                # Fallback: count of oeuvres per field value
+                agg = Oeuvre.objects.values(group_field).annotate(cnt=Count('id')).order_by('-cnt')[:limit]
+                labels = [row.get(group_field) or 'Sans valeur' for row in agg]
+                values = [int(row.get('cnt') or 0) for row in agg]
+                title = f"Répartition des œuvres par {group_field} (top {len(labels)})"
+
+        else:  # global or unknown
+            # If target explicitly global, return galeries vs oeuvres totals
+            total_galeries_views = Galerie.objects.aggregate(total=Coalesce(Sum('vues'), 0))['total'] or 0
+            total_oeuvres_views = Oeuvre.objects.aggregate(total=Coalesce(Sum('vues'), 0))['total'] or 0
+            labels = ['Galeries', 'Œuvres']
+            values = [int(total_galeries_views), int(total_oeuvres_views)]
+            title = 'Vues globales (galeries vs œuvres)'
+
+        # If there's no data, explain
+        if not labels or not any(v > 0 for v in values):
+            return Response({
+                'success': False,
+                'message': 'Aucune donnée disponible pour le critère demandé. Vérifiez la période ou les objets présents dans la base.'
+            })
+
+        return Response({
+            'success': True,
+            'chart_type': chart_type,
+            'title': title,
+            'labels': labels,
+            'values': values,
+            'explanation': f"Généré à partir du prompt: {prompt}"
+        })
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return Response({'success': False, 'message': f"Erreur serveur: {str(e)}"}, status=500)
 
 
 @api_view(['GET'])

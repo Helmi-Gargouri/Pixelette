@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext'
 import Modal from '../../components/Modal'
 import ConfirmModal from '../../components/ConfirmModal'
 import jsPDF from 'jspdf'
+import PredictionModal from '../../components/PredictionModal'
 
 const MesGaleries = () => {
   const [galeries, setGaleries] = useState([])
@@ -23,6 +24,7 @@ const MesGaleries = () => {
   const [viewMode, setViewMode] = useState('list')  // Nouveau : 'list' ou 'clusters'
   const [clusters, setClusters] = useState({})
   const [clustersLoading, setClustersLoading] = useState(false)
+  const [predictionModal, setPredictionModal] = useState({ show: false, galerie: null, data: null })
 
   useEffect(() => {
     // Rediriger si l'utilisateur n'est pas artiste ou admin
@@ -314,6 +316,15 @@ const MesGaleries = () => {
     }
   }
 
+  const handleGaleriePredict = async (galerie) => {
+    try {
+      const resp = await axios.post(`http://localhost:8000/api/galeries/${galerie.id}/predict_popularity/`, {}, { withCredentials: true })
+      setPredictionModal({ show: true, galerie, data: resp.data })
+    } catch (err) {
+      setModal({ show: true, title: 'Erreur', message: 'Impossible de prédire la popularité pour cette galerie', type: 'error' })
+    }
+  }
+
   if (loading) {
     return (
       <div className="preloader">
@@ -333,6 +344,13 @@ const MesGaleries = () => {
         title={modal.title}
         message={modal.message}
         type={modal.type}
+      />
+      
+      <PredictionModal
+        show={predictionModal.show}
+        onClose={() => setPredictionModal({ show: false, galerie: null, data: null })}
+        oeuvre={predictionModal.galerie ? { titre: predictionModal.galerie.nom, image: (predictionModal.galerie.oeuvres_list && predictionModal.galerie.oeuvres_list[0] ? predictionModal.galerie.oeuvres_list[0].image : null) } : null}
+        data={predictionModal.data}
       />
       
       <ConfirmModal
@@ -631,6 +649,14 @@ const MesGaleries = () => {
                     Exporter PDF
                   </button>
                   <button
+                    onClick={() => handleGaleriePredict(galerie)}
+                    className="btn btn-sm me-2"
+                    style={{ backgroundColor: '#3b82f6', borderColor: '#3b82f6', color: '#fff' }}
+                  >
+                    <i className="fas fa-bolt me-1"></i>
+                    Prédire popularité
+                  </button>
+                  <button
                     onClick={() => handleDeleteClick(galerie.id)}
                     className="btn btn-sm"
                     style={{ backgroundColor: '#dc3545', borderColor: '#dc3545', color: '#fff' }}
@@ -764,3 +790,4 @@ const MesGaleries = () => {
 }
 
 export default MesGaleries
+

@@ -4,6 +4,7 @@ import Chart from 'react-apexcharts'
 import SimplePie from '@/components/client-wrapper/SimplePie'
 import FullCalendar from '@fullcalendar/react'
 import dayGridPlugin from '@fullcalendar/daygrid'
+import interactionPlugin from '@fullcalendar/interaction'
 import { getAnalyticsReports, getSubscriptionDistribution, getPagesInteraction, getPresPectiveChart, getUserDeviceChart, getSatisfactionChart, getDailyVisitInsightsChart } from '@/app/(admin)/(dashboards)/analytics/components/data'
 
 const StatCard = ({ stat, onRefresh }) => {
@@ -64,14 +65,16 @@ const StatCard = ({ stat, onRefresh }) => {
 
   // Chart configuration based on type
   const { options, series, chartType } = useMemo(() => {
-    if (!data || data.error) return { options: {}, series: [], chartType: stat.chart_type || 'pie' }
+  if (!data || data.error) return { options: {}, series: [], chartType: (stat.chart_type || 'pie').toLowerCase() }
 
     const rawLabels = Array.isArray(data.labels) ? data.labels : []
     const rawValues = Array.isArray(data.values) ? data.values : []
     const numericValues = rawValues.map(v => Number.isFinite(Number(v)) ? Number(v) : 0)
     const labels = rawLabels.length ? rawLabels : numericValues.map((_, i) => `Item ${i + 1}`)
     
-    const type = (stat.chart_type || 'pie').toLowerCase()
+  // Prefer chart_type returned by the compute endpoint (data.chart_type)
+  // Fall back to the saved stat.chart_type when absent.
+  const type = ((data && data.chart_type) ? String(data.chart_type) : stat.chart_type || 'pie').toLowerCase()
     let chartOptions = { 
       chart: { 
         id: `stat-${stat.id}`,
@@ -210,7 +213,7 @@ const StatCard = ({ stat, onRefresh }) => {
       <div className="space-y-4">
         <FullCalendar
           ref={fcRef}
-          plugins={[dayGridPlugin]}
+          plugins={[dayGridPlugin, interactionPlugin]}
           initialView="dayGridMonth"
           dayCellDidMount={dayCellStyle}
           datesSet={handleDatesSet}

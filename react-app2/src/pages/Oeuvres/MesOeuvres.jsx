@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import { useAuth } from '../../context/AuthContext'
 import Modal from '../../components/Modal'
+import PredictionModal from '../../components/PredictionModal'
 import ConfirmModal from '../../components/ConfirmModal'
 
 const MesOeuvres = () => {
@@ -13,6 +14,7 @@ const MesOeuvres = () => {
   const [searchTerm, setSearchTerm] = useState('')
   const [sortBy, setSortBy] = useState('recent')
   const [modal, setModal] = useState({ show: false, title: '', message: '', type: 'success' })
+  const [predictionModal, setPredictionModal] = useState({ show: false, oeuvre: null, data: null })
   const [confirmModal, setConfirmModal] = useState({ show: false, oeuvreId: null })
   const [predictingId, setPredictingId] = useState(null)
   const { user, isAuthenticated } = useAuth()
@@ -52,7 +54,7 @@ const MesOeuvres = () => {
 
     // Recherche par titre ou description
     if (searchTerm) {
-      result = result.filter(oeuvre => 
+      result = result.filter(oeuvre =>
         oeuvre.titre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         oeuvre.description?.toLowerCase().includes(searchTerm.toLowerCase())
       )
@@ -89,18 +91,18 @@ const MesOeuvres = () => {
         withCredentials: true
       })
       setOeuvres(oeuvres.filter(oeuvre => oeuvre.id !== id))
-      setModal({ 
-        show: true, 
-        title: 'Succès !', 
-        message: 'Oeuvre supprimée avec succès', 
-        type: 'success' 
+      setModal({
+        show: true,
+        title: 'Succès !',
+        message: 'Oeuvre supprimée avec succès',
+        type: 'success'
       })
     } catch (err) {
-      setModal({ 
-        show: true, 
-        title: 'Erreur', 
-        message: 'Erreur lors de la suppression', 
-        type: 'error' 
+      setModal({
+        show: true,
+        title: 'Erreur',
+        message: 'Erreur lors de la suppression',
+        type: 'error'
       })
     }
   }
@@ -118,21 +120,8 @@ const MesOeuvres = () => {
       const tips = data.tips || []
       const aiAdvice = data.ai_advice || ''
 
-      let message = ''
-      if (data.predicted_views !== undefined) {
-        message += `Vues prévues : ${data.predicted_views}`
-      }
-      if (data.confidence !== undefined) {
-        message += `\nConfiance : ${data.confidence}`
-      }
-      if (tips.length) {
-        message += `\n\nConseils :\n- ${tips.join('\n- ')}`
-      }
-      if (aiAdvice) {
-        message += `\n\nConseil IA :\n${aiAdvice}`
-      }
-
-      setModal({ show: true, title: `Prédiction — ${oeuvre.titre}`, message: message, type: 'success' })
+      // Open structured prediction modal with the returned data
+      setPredictionModal({ show: true, oeuvre, data: { ...data, tips, ai_advice: aiAdvice } })
     } catch (err) {
       console.error('Prediction error', err)
       setModal({ show: true, title: 'Erreur de prédiction', message: 'Impossible de prédire la popularité pour le moment.', type: 'error' })
@@ -145,7 +134,7 @@ const MesOeuvres = () => {
   const distributeOeuvres = (oeuvres) => {
     const leftColumn = []
     const rightColumn = []
-    
+
     oeuvres.forEach((oeuvre, index) => {
       // Alterner entre gauche et droite
       if (index % 2 === 0) {
@@ -154,7 +143,7 @@ const MesOeuvres = () => {
         rightColumn.push(oeuvre)
       }
     })
-    
+
     return { leftColumn, rightColumn }
   }
 
@@ -178,7 +167,14 @@ const MesOeuvres = () => {
         message={modal.message}
         type={modal.type}
       />
-      
+
+      <PredictionModal
+        show={predictionModal.show}
+        onClose={() => setPredictionModal({ show: false, oeuvre: null, data: null })}
+        oeuvre={predictionModal.oeuvre}
+        data={predictionModal.data}
+      />
+
       <ConfirmModal
         show={confirmModal.show}
         onClose={() => setConfirmModal({ show: false, oeuvreId: null })}
@@ -208,9 +204,9 @@ const MesOeuvres = () => {
             <div className="row align-items-center">
               <div className="col-lg-5 col-md-12 mb-3 mb-lg-0">
                 <div className="input-group" style={{ boxShadow: '0 2px 10px rgba(0,0,0,0.05)' }}>
-                  <span className="input-group-text" style={{ 
-                    background: '#fff', 
-                    border: 'none', 
+                  <span className="input-group-text" style={{
+                    background: '#fff',
+                    border: 'none',
                     borderRadius: '10px 0 0 10px',
                     padding: '12px 15px'
                   }}>
@@ -222,7 +218,7 @@ const MesOeuvres = () => {
                     placeholder="Rechercher par titre ou description..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    style={{ 
+                    style={{
                       border: 'none',
                       padding: '12px 15px',
                       fontSize: '15px',
@@ -233,7 +229,7 @@ const MesOeuvres = () => {
                     <button
                       className="btn"
                       onClick={() => setSearchTerm('')}
-                      style={{ 
+                      style={{
                         border: 'none',
                         background: '#fff',
                         borderRadius: '0 10px 10px 0',
@@ -250,7 +246,7 @@ const MesOeuvres = () => {
                   className="form-select"
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value)}
-                  style={{ 
+                  style={{
                     border: 'none',
                     padding: '12px 15px',
                     fontSize: '15px',
@@ -271,7 +267,7 @@ const MesOeuvres = () => {
                 </Link>
               </div>
               <div className="col-lg-2 col-md-6">
-                <Link to="/oeuvres/ai-generator" className="btn w-100" style={{ 
+                <Link to="/oeuvres/ai-generator" className="btn w-100" style={{
                   padding: '12px',
                   background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                   border: 'none'
@@ -284,9 +280,9 @@ const MesOeuvres = () => {
 
           {/* Résultats de recherche */}
           {searchTerm && (
-            <div className="mb-4" style={{ 
-              padding: '12px 20px', 
-              background: '#fff', 
+            <div className="mb-4" style={{
+              padding: '12px 20px',
+              background: '#fff',
               borderRadius: '10px',
               border: '1px solid #e0e0e0',
               display: 'inline-block'
@@ -313,7 +309,7 @@ const MesOeuvres = () => {
                     <i className="fas fa-plus me-2"></i>
                     Créer ma première oeuvre
                   </Link>
-                  <Link to="/oeuvres/ai-generator" className="btn" style={{ 
+                  <Link to="/oeuvres/ai-generator" className="btn" style={{
                     background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                     border: 'none'
                   }}>
@@ -326,7 +322,7 @@ const MesOeuvres = () => {
           ) : (
             (() => {
               const { leftColumn, rightColumn } = distributeOeuvres(filteredOeuvres)
-              
+
               return (
                 <div className="row gx-4">
                   {/* Colonne de gauche */}
@@ -337,14 +333,14 @@ const MesOeuvres = () => {
                           <div className="portfolio-card-4" style={{ cursor: 'pointer' }}>
                             <div className="portfolio-thumb">
                               {oeuvre.image ? (
-                                <img 
-                                  src={oeuvre.image.startsWith('http') 
-                                    ? oeuvre.image 
+                                <img
+                                  src={oeuvre.image.startsWith('http')
+                                    ? oeuvre.image
                                     : `http://localhost:8000${oeuvre.image}`
-                                  } 
+                                  }
                                   alt={oeuvre.titre}
-                                  style={{ 
-                                    width: '100%', 
+                                  style={{
+                                    width: '100%',
                                     height: 'auto',
                                     display: 'block',
                                     borderRadius: '10px'
@@ -355,11 +351,11 @@ const MesOeuvres = () => {
                                   }}
                                 />
                               ) : (
-                                <img 
-                                  src="/assets/img/portfolio/portfolio_page1_3.png" 
+                                <img
+                                  src="/assets/img/portfolio/portfolio_page1_3.png"
                                   alt={oeuvre.titre}
-                                  style={{ 
-                                    width: '100%', 
+                                  style={{
+                                    width: '100%',
                                     height: 'auto',
                                     display: 'block',
                                     borderRadius: '10px'
@@ -373,8 +369,8 @@ const MesOeuvres = () => {
                                 {oeuvre.titre}
                               </h3>
                               {oeuvre.description && (
-                                <p className="portfolio-description" style={{ 
-                                  color: '#666', 
+                                <p className="portfolio-description" style={{
+                                  color: '#666',
                                   fontSize: '0.95rem',
                                   marginTop: '15px',
                                   lineHeight: '1.8'
@@ -388,10 +384,10 @@ const MesOeuvres = () => {
                         </Link>
                         {/* Boutons d'action sous l'image */}
                         <div className="d-flex gap-2 mt-2">
-                          <Link 
-                            to={`/oeuvres/${oeuvre.id}/edit`} 
+                          <Link
+                            to={`/oeuvres/${oeuvre.id}/edit`}
                             className="btn btn-sm flex-fill"
-                            style={{ 
+                            style={{
                               backgroundColor: '#6c757d',
                               borderColor: '#6c757d',
                               color: '#fff'
@@ -407,22 +403,51 @@ const MesOeuvres = () => {
                             }}
                             className="btn btn-sm flex-fill"
                             style={{
-                              backgroundColor: '#0d6efd',
-                              borderColor: '#0d6efd',
-                              color: '#fff'
+                              background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+                              border: 'none',
+                              color: '#fff',
+                              borderRadius: '8px',
+                              padding: '8px 12px',
+                              fontWeight: '600',
+                              fontSize: '12px',
+                              transition: 'all 0.3s ease',
+                              boxShadow: '0 2px 8px rgba(139, 92, 246, 0.3)',
+                              position: 'relative',
+                              overflow: 'hidden'
                             }}
                             disabled={predictingId === oeuvre.id}
+                            onMouseOver={(e) => {
+                              if (predictingId !== oeuvre.id) {
+                                e.target.style.transform = 'translateY(-2px)'
+                                e.target.style.boxShadow = '0 4px 12px rgba(139, 92, 246, 0.4)'
+                              }
+                            }}
+                            onMouseOut={(e) => {
+                              if (predictingId !== oeuvre.id) {
+                                e.target.style.transform = 'translateY(0)'
+                                e.target.style.boxShadow = '0 2px 8px rgba(139, 92, 246, 0.3)'
+                              }
+                            }}
                           >
-                            <i className="fas fa-chart-line me-1"></i>
-                            {predictingId === oeuvre.id ? 'Prédiction...' : 'Prédire popularité'}
+                            {predictingId === oeuvre.id ? (
+                              <>
+                                <div className="spinner-border spinner-border-sm me-1" style={{ width: '12px', height: '12px' }}></div>
+                                Analyse...
+                              </>
+                            ) : (
+                              <>
+                                <i className="fas fa-chart-line me-1"></i>
+                                Prédire popularité
+                              </>
+                            )}
                           </button>
-                          <button 
+                          <button
                             onClick={(e) => {
                               e.preventDefault()
                               handleDeleteClick(oeuvre.id)
                             }}
                             className="btn btn-sm flex-fill"
-                            style={{ 
+                            style={{
                               backgroundColor: '#dc3545',
                               borderColor: '#dc3545',
                               color: '#fff'
@@ -444,14 +469,14 @@ const MesOeuvres = () => {
                           <div className="portfolio-card-4" style={{ cursor: 'pointer' }}>
                             <div className="portfolio-thumb">
                               {oeuvre.image ? (
-                                <img 
-                                  src={oeuvre.image.startsWith('http') 
-                                    ? oeuvre.image 
+                                <img
+                                  src={oeuvre.image.startsWith('http')
+                                    ? oeuvre.image
                                     : `http://localhost:8000${oeuvre.image}`
-                                  } 
+                                  }
                                   alt={oeuvre.titre}
-                                  style={{ 
-                                    width: '100%', 
+                                  style={{
+                                    width: '100%',
                                     height: 'auto',
                                     display: 'block',
                                     borderRadius: '10px'
@@ -462,11 +487,11 @@ const MesOeuvres = () => {
                                   }}
                                 />
                               ) : (
-                                <img 
-                                  src="/assets/img/portfolio/portfolio_page1_3.png" 
+                                <img
+                                  src="/assets/img/portfolio/portfolio_page1_3.png"
                                   alt={oeuvre.titre}
-                                  style={{ 
-                                    width: '100%', 
+                                  style={{
+                                    width: '100%',
                                     height: 'auto',
                                     display: 'block',
                                     borderRadius: '10px'
@@ -480,8 +505,8 @@ const MesOeuvres = () => {
                                 {oeuvre.titre}
                               </h3>
                               {oeuvre.description && (
-                                <p className="portfolio-description" style={{ 
-                                  color: '#666', 
+                                <p className="portfolio-description" style={{
+                                  color: '#666',
                                   fontSize: '0.95rem',
                                   marginTop: '15px',
                                   lineHeight: '1.8'
@@ -495,10 +520,10 @@ const MesOeuvres = () => {
                         </Link>
                         {/* Boutons d'action sous l'image */}
                         <div className="d-flex gap-2 mt-2">
-                          <Link 
-                            to={`/oeuvres/${oeuvre.id}/edit`} 
+                          <Link
+                            to={`/oeuvres/${oeuvre.id}/edit`}
                             className="btn btn-sm flex-fill"
-                            style={{ 
+                            style={{
                               backgroundColor: '#6c757d',
                               borderColor: '#6c757d',
                               color: '#fff'
@@ -514,22 +539,51 @@ const MesOeuvres = () => {
                             }}
                             className="btn btn-sm flex-fill"
                             style={{
-                              backgroundColor: '#0d6efd',
-                              borderColor: '#0d6efd',
-                              color: '#fff'
+                              background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+                              border: 'none',
+                              color: '#fff',
+                              borderRadius: '8px',
+                              padding: '8px 12px',
+                              fontWeight: '600',
+                              fontSize: '12px',
+                              transition: 'all 0.3s ease',
+                              boxShadow: '0 2px 8px rgba(139, 92, 246, 0.3)',
+                              position: 'relative',
+                              overflow: 'hidden'
                             }}
                             disabled={predictingId === oeuvre.id}
+                            onMouseOver={(e) => {
+                              if (predictingId !== oeuvre.id) {
+                                e.target.style.transform = 'translateY(-2px)'
+                                e.target.style.boxShadow = '0 4px 12px rgba(139, 92, 246, 0.4)'
+                              }
+                            }}
+                            onMouseOut={(e) => {
+                              if (predictingId !== oeuvre.id) {
+                                e.target.style.transform = 'translateY(0)'
+                                e.target.style.boxShadow = '0 2px 8px rgba(139, 92, 246, 0.3)'
+                              }
+                            }}
                           >
-                            <i className="fas fa-chart-line me-1"></i>
-                            {predictingId === oeuvre.id ? 'Prédiction...' : 'Prédire popularité'}
+                            {predictingId === oeuvre.id ? (
+                              <>
+                                <div className="spinner-border spinner-border-sm me-1" style={{ width: '12px', height: '12px' }}></div>
+                                Analyse...
+                              </>
+                            ) : (
+                              <>
+                                <i className="fas fa-chart-line me-1"></i>
+                                Prédire popularité
+                              </>
+                            )}
                           </button>
-                          <button 
+                          <button
                             onClick={(e) => {
                               e.preventDefault()
                               handleDeleteClick(oeuvre.id)
                             }}
                             className="btn btn-sm flex-fill"
-                            style={{ 
+                            style={{
                               backgroundColor: '#dc3545',
                               borderColor: '#dc3545',
                               color: '#fff'

@@ -27,6 +27,7 @@ from .views import (
 from .views import users_by_date
 from .views import views_by_artist
 from .views import generate_summary_pdf
+from .views import ai_generate_chart
 
 
 router = routers.DefaultRouter()
@@ -50,6 +51,7 @@ urlpatterns = [
     path('api/users/by-date/', users_by_date, name='users_by_date'),
     path('api/stats/views-by-artist/', views_by_artist, name='views_by_artist'),
     path('api/reports/summary/', generate_summary_pdf, name='generate_summary_pdf'),
+    path('api/ai/generate-chart/', ai_generate_chart, name='ai_generate_chart'),
 ]
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

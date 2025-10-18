@@ -64,7 +64,7 @@ const SimplePie = ({ series = [], labels = [], colors = ['#3b82f6', '#f59e0b'], 
   const onLeave = () => setTooltip(prev => ({ ...prev, visible: false }))
 
   return (
-    <div ref={containerRef} style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+    <div ref={containerRef} style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative', overflow: 'hidden' }}>
       <div style={{ width: '100%', maxWidth: 420, display: 'flex', justifyContent: 'center' }}>
         <svg viewBox={`0 0 ${size} ${size}`} style={{ width: '100%', height: 'auto' }}>
           <g>
@@ -89,23 +89,15 @@ const SimplePie = ({ series = [], labels = [], colors = ['#3b82f6', '#f59e0b'], 
 
       {/* tooltip */}
       {tooltip.visible && (
-        <div style={{ position: 'absolute', pointerEvents: 'none', transform: `translate(${tooltip.x}px, ${tooltip.y}px)` }}>
-          <div style={{ background: 'white', padding: 8, borderRadius: 6, boxShadow: '0 4px 12px rgba(0,0,0,0.12)', fontSize: 12 }}>
-            <div style={{ fontWeight: 600 }}>{tooltip.label}</div>
+        <div style={{ position: 'absolute', pointerEvents: 'none', transform: `translate(${tooltip.x}px, ${tooltip.y}px)`, zIndex: 50 }}>
+          <div style={{ background: 'white', padding: 8, borderRadius: 6, boxShadow: '0 4px 12px rgba(0,0,0,0.12)', fontSize: 12, maxWidth: 320, whiteSpace: 'normal' }}>
+            <div style={{ fontWeight: 600, marginBottom: 4 }}>{tooltip.label}</div>
             <div style={{ color: '#444' }}>{tooltip.value} ({tooltip.percent}%)</div>
           </div>
         </div>
       )}
 
-      {/* legend */}
-      <div className="mt-3 text-sm text-default-700" style={{ width: '100%', maxWidth: 420 }}>
-        {arcs.map((a, i) => (
-          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-            <span style={{ display: 'inline-block', width: 12, height: 12, background: a.color }}></span>
-            <div>{a.label}: <strong>{a.value}</strong> <span style={{ color: '#666' }}>({a.percent}%)</span></div>
-          </div>
-        ))}
-      </div>
+      {/* legend removed to avoid overflow; tooltip still available on hover */}
     </div>
   )
 }
