@@ -38,6 +38,11 @@ export const menuItemsData = [{
   icon: LuPalette,
   href: '/galeries-list'
 }, {
+  key: 'GestionInteractions',
+  label: 'Gestion Interactions',
+  icon: LuMessagesSquare,
+  href: '/gestion-interactions'
+}, {
   key: 'Overview',
   label: 'Overview',
   isTitle: true
