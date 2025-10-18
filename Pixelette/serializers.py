@@ -96,9 +96,68 @@ class GalerieInvitationSerializer(serializers.ModelSerializer):
         return f"{obj.utilisateur.prenom} {obj.utilisateur.nom}"
 
 class InteractionSerializer(serializers.ModelSerializer):
+    utilisateur_nom = serializers.SerializerMethodField()
+    oeuvre_titre = serializers.SerializerMethodField()
+    
     class Meta:
         model = Interaction
-        fields = '__all__'
+        fields = [
+            'id', 'type', 'utilisateur', 'utilisateur_nom', 
+            'oeuvre', 'oeuvre_titre', 'contenu', 'plateforme_partage', 'date'
+        ]
+        read_only_fields = ['id', 'date', 'utilisateur_nom', 'oeuvre_titre']
+    
+    def get_utilisateur_nom(self, obj):
+        return f"{obj.utilisateur.prenom} {obj.utilisateur.nom}"
+    
+    def get_oeuvre_titre(self, obj):
+        return obj.oeuvre.titre
+    
+    def validate(self, data):
+        # Validation pour les commentaires
+        if data.get('type') == 'commentaire':
+            if not data.get('contenu', '').strip():
+                raise serializers.ValidationError("Le contenu est obligatoire pour un commentaire.")
+        
+        # Validation pour les partages
+        if data.get('type') == 'partage':
+            if not data.get('plateforme_partage'):
+                raise serializers.ValidationError("La plateforme est obligatoire pour un partage.")
+            # Nettoyer le contenu pour les partages (pas nécessaire)
+            data['contenu'] = ''
+        
+        # Nettoyer plateforme_partage pour like et commentaire
+        if data.get('type') in ['like', 'commentaire']:
+            data['plateforme_partage'] = ''
+            
+        return data
+
+class InteractionCreateSerializer(serializers.ModelSerializer):
+    """Serializer spécialisé pour la création d'interactions"""
+    
+    class Meta:
+        model = Interaction
+        fields = ['type', 'oeuvre', 'contenu', 'plateforme_partage']
+    
+    def validate(self, data):
+        # Validation selon le type
+        if data.get('type') == 'commentaire':
+            if not data.get('contenu', '').strip():
+                raise serializers.ValidationError("Le contenu est obligatoire pour un commentaire.")
+        elif data.get('type') == 'partage':
+            if not data.get('plateforme_partage'):
+                raise serializers.ValidationError("La plateforme est obligatoire pour un partage.")
+        
+        return data
+
+class InteractionStatsSerializer(serializers.Serializer):
+    """Serializer pour les statistiques d'interactions"""
+    oeuvre_id = serializers.IntegerField()
+    oeuvre_titre = serializers.CharField()
+    total_likes = serializers.IntegerField()
+    total_commentaires = serializers.IntegerField()
+    total_partages = serializers.IntegerField()
+    total_interactions = serializers.IntegerField()
 
 class StatistiqueSerializer(serializers.ModelSerializer):
     class Meta:

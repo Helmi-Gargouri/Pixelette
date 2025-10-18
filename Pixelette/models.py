@@ -98,12 +98,34 @@ class Interaction(models.Model):
     TYPE_CHOICES = [
         ("like", "Like"),
         ("commentaire", "Commentaire"),
+        ("partage", "Partage"),
     ]
     type = models.CharField(max_length=20, choices=TYPE_CHOICES, verbose_name="Type d'interaction")
-    utilisateur = models.ForeignKey(Utilisateur, on_delete=models.CASCADE, verbose_name="Utilisateur")
-    oeuvre = models.ForeignKey(Oeuvre, on_delete=models.CASCADE, verbose_name="Œuvre")
+    utilisateur = models.ForeignKey(Utilisateur, on_delete=models.CASCADE, related_name="interactions", verbose_name="Utilisateur")
+    oeuvre = models.ForeignKey(Oeuvre, on_delete=models.CASCADE, related_name="interactions", verbose_name="Œuvre")
     contenu = models.TextField(blank=True, verbose_name="Contenu du commentaire")
+    
+    # Champs spécifiques au partage
+    plateforme_partage = models.CharField(
+        max_length=50, 
+        blank=True, 
+        choices=[
+            ('facebook', 'Facebook'),
+            ('twitter', 'Twitter'),
+            ('instagram', 'Instagram'),
+            ('email', 'Email'),
+            ('link', 'Lien direct'),
+        ],
+        verbose_name="Plateforme de partage"
+    )
+    
     date = models.DateTimeField(auto_now_add=True, verbose_name="Date")
+    
+    class Meta:
+        unique_together = ['utilisateur', 'oeuvre', 'type']
+        verbose_name = "Interaction"
+        verbose_name_plural = "Interactions"
+        ordering = ['-date']
 
     def __str__(self):
         return f"{self.type} par {self.utilisateur} sur {self.oeuvre}"

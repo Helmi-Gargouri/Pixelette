@@ -6,7 +6,7 @@ from .utils.spotify import generate_playlist_for_gallery, search_playlists_by_th
 from rest_framework.permissions import IsAuthenticatedOrReadOnly
 from rest_framework import viewsets
 from .models import Utilisateur, Oeuvre, Galerie, Interaction, Statistique, GalerieInvitation
-from .serializers import UtilisateurSerializer, OeuvreSerializer, GalerieSerializer, InteractionSerializer, StatistiqueSerializer, GalerieInvitationSerializer
+from .serializers import UtilisateurSerializer, OeuvreSerializer, GalerieSerializer, InteractionSerializer, StatistiqueSerializer, GalerieInvitationSerializer, InteractionCreateSerializer
 from rest_framework import status 
 from django.core.mail import send_mail
 from rest_framework.decorators import action  
@@ -18,6 +18,8 @@ from django.utils import timezone
 from rest_framework.authtoken.models import Token
 from django.contrib.auth import login  
 from rest_framework.authtoken.models import Token
+from django.db import models
+from django.db.models import Count, Q
 from django.core.cache import cache 
 from rest_framework.decorators import action 
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
@@ -834,6 +836,124 @@ L'équipe Pixelette
 class InteractionViewSet(viewsets.ModelViewSet):
     queryset = Interaction.objects.all()
     serializer_class = InteractionSerializer
+    permission_classes = [IsAuthenticated]
+    
+    def get_serializer_class(self):
+        if self.action in ['create', 'update', 'partial_update']:
+            return InteractionCreateSerializer
+        return InteractionSerializer
+    
+    def get_queryset(self):
+        queryset = Interaction.objects.select_related('utilisateur', 'oeuvre')
+        
+        # Filtres optionnels
+        oeuvre_id = self.request.query_params.get('oeuvre')
+        type_interaction = self.request.query_params.get('type')
+        utilisateur_id = self.request.query_params.get('utilisateur')
+        
+        if oeuvre_id:
+            queryset = queryset.filter(oeuvre_id=oeuvre_id)
+        if type_interaction:
+            queryset = queryset.filter(type=type_interaction)
+        if utilisateur_id:
+            queryset = queryset.filter(utilisateur_id=utilisateur_id)
+            
+        return queryset.order_by('-date')
+    
+    def perform_create(self, serializer):
+        # Automatiquement assigner l'utilisateur connecté
+        serializer.save(utilisateur=self.request.user)
+    
+    @action(detail=False, methods=['post'])
+    def toggle_like(self, request):
+        """Endpoint pour toggler un like (ajouter/supprimer)"""
+        oeuvre_id = request.data.get('oeuvre')
+        if not oeuvre_id:
+            return Response({'error': 'oeuvre_id requis'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            oeuvre = Oeuvre.objects.get(id=oeuvre_id)
+        except Oeuvre.DoesNotExist:
+            return Response({'error': 'Œuvre non trouvée'}, status=status.HTTP_404_NOT_FOUND)
+        
+        # Vérifier si l'utilisateur a déjà liké
+        interaction, created = Interaction.objects.get_or_create(
+            utilisateur=request.user,
+            oeuvre=oeuvre,
+            type='like',
+            defaults={'contenu': '', 'plateforme_partage': ''}
+        )
+        
+        if not created:
+            # Si existe déjà, supprimer (unlike)
+            interaction.delete()
+            return Response({
+                'message': 'Like retiré',
+                'liked': False,
+                'total_likes': oeuvre.interactions.filter(type='like').count()
+            })
+        else:
+            # Nouveau like
+            return Response({
+                'message': 'Like ajouté',
+                'liked': True,
+                'total_likes': oeuvre.interactions.filter(type='like').count()
+            })
+    
+    @action(detail=False, methods=['get'])
+    def stats_by_oeuvre(self, request):
+        """Statistiques d'interactions par œuvre"""
+        oeuvre_id = request.query_params.get('oeuvre')
+        
+        if oeuvre_id:
+            # Stats pour une œuvre spécifique
+            try:
+                oeuvre = Oeuvre.objects.get(id=oeuvre_id)
+                interactions = oeuvre.interactions.all()
+                
+                stats = {
+                    'oeuvre_id': oeuvre.id,
+                    'oeuvre_titre': oeuvre.titre,
+                    'total_likes': interactions.filter(type='like').count(),
+                    'total_commentaires': interactions.filter(type='commentaire').count(),
+                    'total_partages': interactions.filter(type='partage').count(),
+                    'total_interactions': interactions.count(),
+                    'interactions_recentes': InteractionSerializer(
+                        interactions.order_by('-date')[:5], many=True
+                    ).data
+                }
+                return Response(stats)
+            except Oeuvre.DoesNotExist:
+                return Response({'error': 'Œuvre non trouvée'}, status=status.HTTP_404_NOT_FOUND)
+        else:
+            # Stats globales pour toutes les œuvres
+            from django.db.models import Count
+            stats = Oeuvre.objects.annotate(
+                total_likes=Count('interactions', filter=Q(interactions__type='like')),
+                total_commentaires=Count('interactions', filter=Q(interactions__type='commentaire')),
+                total_partages=Count('interactions', filter=Q(interactions__type='partage')),
+                total_interactions=Count('interactions')
+            ).values(
+                'id', 'titre', 'total_likes', 'total_commentaires', 
+                'total_partages', 'total_interactions'
+            )
+            
+            return Response(list(stats))
+    
+    @action(detail=True, methods=['delete'])
+    def delete_my_interaction(self, request, pk=None):
+        """Permettre à l'utilisateur de supprimer ses propres interactions"""
+        try:
+            interaction = self.get_object()
+            if interaction.utilisateur != request.user:
+                return Response(
+                    {'error': 'Vous pouvez seulement supprimer vos propres interactions'}, 
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            interaction.delete()
+            return Response({'message': 'Interaction supprimée'}, status=status.HTTP_200_OK)
+        except Interaction.DoesNotExist:
+            return Response({'error': 'Interaction non trouvée'}, status=status.HTTP_404_NOT_FOUND)
 
 class StatistiqueViewSet(viewsets.ModelViewSet):
     queryset = Statistique.objects.all()
