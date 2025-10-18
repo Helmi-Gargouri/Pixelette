@@ -39,6 +39,7 @@ import GalerieDetails from './pages/Galeries/GalerieDetails';
 import GalerieManageOeuvres from './pages/Galeries/GalerieManageOeuvres';
 import MesGaleries from './pages/Galeries/MesGaleries';
 import AcceptInvite from './pages/Galeries/AcceptInvite';
+import ArtistesList from './pages/ArtistesList' 
 
 function App() {
   useEffect(() => {
@@ -116,7 +117,7 @@ function App() {
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/code-verification" element={<CodeVerification />} />
             <Route path="/two-factor" element={<TwoFactorAuth />} />
-
+            <Route path="/artistes" element={<ArtistesList />} />
             
             {/* Routes Oeuvres */}
             <Route path="/oeuvres/create" element={<OeuvreCreate />} />

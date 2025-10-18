@@ -22,7 +22,7 @@ const Login = () => {
       const userData = response.data.user;
       
       // Si l'utilisateur est admin, rediriger vers le backoffice
-      if (userData && userData.role === 'admin') {
+     /* if (userData && userData.role === 'admin') {
         // Stocke les données pour le backoffice
         window.sessionStorage.setItem('admin_user_data', JSON.stringify(userData));
         
@@ -38,7 +38,7 @@ const Login = () => {
           window.location.href = 'http://localhost:5174';
         }, 1500);
         return;
-      }
+      }*/
            // Si 2FA requis
       if (response.data.message === '2FA required') {
         localStorage.setItem('email', email);

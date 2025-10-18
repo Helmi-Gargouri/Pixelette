@@ -1,7 +1,7 @@
 from rest_framework import serializers
-from .models import Utilisateur, Oeuvre, Galerie, Interaction, Statistique, DemandeRole, GalerieInvitation
 from django.contrib.auth.hashers import make_password  
 import pyotp
+from .models import Utilisateur, Oeuvre, Galerie, Interaction, Statistique, DemandeRole, GalerieInvitation, Suivi
 
 class UtilisateurSerializer(serializers.ModelSerializer):
     password_confirm = serializers.CharField(write_only=True, required=False)
@@ -126,4 +126,36 @@ class ResetPasswordSerializer(serializers.Serializer):
         if 'new_password' in data and 'password_confirm' in data:
             if data['new_password'] != data['password_confirm']:
                 raise serializers.ValidationError({"password": "Les mots de passe ne correspondent pas."})
+        return data
+    
+class SuiviSerializer(serializers.ModelSerializer):
+    utilisateur_nom = serializers.SerializerMethodField()
+    artiste_nom = serializers.SerializerMethodField()
+    utilisateur_email = serializers.EmailField(source='utilisateur.email', read_only=True)
+    artiste_email = serializers.EmailField(source='artiste.email', read_only=True)
+    
+    class Meta:
+        model = Suivi
+        fields = ['id', 'utilisateur', 'utilisateur_nom', 'utilisateur_email', 
+                  'artiste', 'artiste_nom', 'artiste_email', 'date_suivi']
+        read_only_fields = ['id', 'date_suivi']
+    
+    def get_utilisateur_nom(self, obj):
+        return f"{obj.utilisateur.prenom} {obj.utilisateur.nom}"
+    
+    def get_artiste_nom(self, obj):
+        return f"{obj.artiste.prenom} {obj.artiste.nom}"
+    
+    def validate(self, data):
+        utilisateur = data.get('utilisateur')
+        artiste = data.get('artiste')
+        
+        # Vérifier qu'on ne se suit pas soi-même
+        if utilisateur == artiste:
+            raise serializers.ValidationError("Vous ne pouvez pas vous suivre vous-même")
+        
+        # Vérifier que c'est bien un artiste
+        if artiste.role != 'artiste':
+            raise serializers.ValidationError("Vous ne pouvez suivre que des artistes")
+        
         return data

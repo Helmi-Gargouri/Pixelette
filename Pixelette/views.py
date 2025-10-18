@@ -5,8 +5,8 @@ from .utils.clustering import cluster_galeries
 from .utils.spotify import generate_playlist_for_gallery, search_playlists_by_theme, get_spotify_oauth, create_playlist_in_user_account
 from rest_framework.permissions import IsAuthenticatedOrReadOnly
 from rest_framework import viewsets
-from .models import Utilisateur, Oeuvre, Galerie, Interaction, Statistique, GalerieInvitation
-from .serializers import UtilisateurSerializer, OeuvreSerializer, GalerieSerializer, InteractionSerializer, StatistiqueSerializer, GalerieInvitationSerializer
+from .models import Utilisateur, Oeuvre, Galerie, Interaction, Statistique, GalerieInvitation, Suivi
+from .serializers import UtilisateurSerializer, OeuvreSerializer, GalerieSerializer, InteractionSerializer, StatistiqueSerializer, GalerieInvitationSerializer, SuiviSerializer
 from rest_framework import status 
 from django.core.mail import send_mail
 from rest_framework.decorators import action  
@@ -47,6 +47,7 @@ import requests
 import io
 from PIL import Image
 
+
 class IsAdmin(permissions.BasePermission):
     def has_permission(self, request, view):
         return request.user and hasattr(request.user, 'role') and request.user.role == 'admin'
@@ -67,7 +68,7 @@ class UtilisateurViewSet(viewsets.ModelViewSet):
     permission_classes = [AllowAny]  
 
     def get_permissions(self):
-        if self.action in ['create', 'login', 'profile', 'logout',  'generate_2fa', 'enable_2fa', 'verify_2fa', 'disable_2fa', 'get_2fa_qr', 'request_artist_role','reset_password_code','forgot_password','verify_code','request_password_reset', 'count']:
+        if self.action in ['create', 'login', 'profile', 'logout',  'generate_2fa', 'enable_2fa', 'verify_2fa', 'disable_2fa', 'get_2fa_qr', 'request_artist_role','reset_password_code','forgot_password','verify_code','request_password_reset', 'count', 'artistes']:
             permission_classes = [AllowAny]
         elif self.action == 'assign_role':
             permission_classes = [IsAuthenticated]  
@@ -123,7 +124,7 @@ class UtilisateurViewSet(viewsets.ModelViewSet):
         
         old_role = user.role
         user.role = new_role
-        user.save()  # Déclenche le signal notif (étape 5)
+        user.save()  
         
         return Response({'message': f'Rôle changé de {old_role} à {new_role} pour {user.prenom} {user.nom}'})
     
@@ -231,7 +232,6 @@ class UtilisateurViewSet(viewsets.ModelViewSet):
                     'message': 'Scannez le QR code avec Google Authenticator'
                 })
             
-            # Cas 2 : Code fourni → Vérifier et connecter
             else:
                 print("🔐 Vérification du code TOTP...")
                 # Déterminer quel secret utiliser
@@ -398,6 +398,30 @@ class UtilisateurViewSet(viewsets.ModelViewSet):
             return Response({'message': 'Mot de passe réinitialisé !'})
         except Utilisateur.DoesNotExist:
             return Response({'error': 'Email non trouvé.'}, status=400)
+        
+    @action(detail=False, methods=['get'], permission_classes=[AllowAny])
+    def artistes(self, request):
+        """Liste tous les utilisateurs ayant le rôle 'artiste'"""
+        artistes = Utilisateur.objects.filter(role='artiste')
+        serializer = self.get_serializer(artistes, many=True, context={'request': request})
+        
+        # Ajouter le statut de suivi pour chaque artiste si l'utilisateur est connecté
+        artistes_data = serializer.data
+        if request.user.is_authenticated:
+            user_suivis = Suivi.objects.filter(utilisateur=request.user).values_list('artiste_id', flat=True)
+            for artiste in artistes_data:
+                artiste['is_followed'] = artiste['id'] in user_suivis
+                # Compter le nombre d'abonnés
+                artiste['followers_count'] = Suivi.objects.filter(artiste_id=artiste['id']).count()
+        else:
+            for artiste in artistes_data:
+                artiste['is_followed'] = False
+                artiste['followers_count'] = Suivi.objects.filter(artiste_id=artiste['id']).count()
+        
+        return Response({
+            'count': len(artistes_data),
+            'artistes': artistes_data
+        })
          
 class OeuvreViewSet(viewsets.ModelViewSet):
     queryset = Oeuvre.objects.all()
@@ -884,6 +908,89 @@ class DemandeRoleViewSet(viewsets.ModelViewSet):
         nom_utilisateur = f"{demande.utilisateur.prenom} {demande.utilisateur.nom}"
         return Response({'message': f'Demande rejetée pour {nom_utilisateur}.'})
 
+class SuiviViewSet(viewsets.ModelViewSet):
+    queryset = Suivi.objects.all()
+    serializer_class = SuiviSerializer
+    permission_classes = [IsAuthenticated]
+    
+    def get_queryset(self):
+        """Filtrer selon l'utilisateur connecté"""
+        user = self.request.user
+        if user.role == 'artiste':
+            # Si artiste, voir ses abonnés
+            return Suivi.objects.filter(artiste=user)
+        else:
+            # Si user, voir ses suivis
+            return Suivi.objects.filter(utilisateur=user)
+    
+    def create(self, request):
+        """Suivre un artiste"""
+        artiste_id = request.data.get('artiste_id')
+        
+        if not artiste_id:
+            return Response({'error': 'ID de l\'artiste requis'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            artiste = Utilisateur.objects.get(id=artiste_id)
+        except Utilisateur.DoesNotExist:
+            return Response({'error': 'Artiste non trouvé'}, status=status.HTTP_404_NOT_FOUND)
+        
+        # Vérifier qu'on ne se suit pas soi-même
+        if request.user == artiste:
+            return Response({'error': 'Vous ne pouvez pas vous suivre vous-même'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Vérifier que c'est un artiste
+        if artiste.role != 'artiste':
+            return Response({'error': 'Vous ne pouvez suivre que des artistes'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Vérifier si déjà suivi
+        if Suivi.objects.filter(utilisateur=request.user, artiste=artiste).exists():
+            return Response({'error': 'Vous suivez déjà cet artiste'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Créer le suivi
+        suivi = Suivi.objects.create(utilisateur=request.user, artiste=artiste)
+        serializer = self.get_serializer(suivi)
+        
+        return Response({
+            'message': f'Vous suivez maintenant {artiste.prenom} {artiste.nom}',
+            'suivi': serializer.data
+        }, status=status.HTTP_201_CREATED)
+    
+    @action(detail=True, methods=['delete'])
+    def unfollow(self, request, pk=None):
+        """Ne plus suivre un artiste"""
+        try:
+            suivi = Suivi.objects.get(utilisateur=request.user, artiste_id=pk)
+            artiste_nom = f"{suivi.artiste.prenom} {suivi.artiste.nom}"
+            suivi.delete()
+            return Response({
+                'message': f'Vous ne suivez plus {artiste_nom}'
+            }, status=status.HTTP_200_OK)
+        except Suivi.DoesNotExist:
+            return Response({'error': 'Vous ne suivez pas cet artiste'}, status=status.HTTP_404_NOT_FOUND)
+    
+    @action(detail=False, methods=['get'])
+    def mes_suivis(self, request):
+        """Liste des artistes que je suis"""
+        suivis = Suivi.objects.filter(utilisateur=request.user)
+        serializer = self.get_serializer(suivis, many=True)
+        return Response({
+            'count': suivis.count(),
+            'suivis': serializer.data
+        })
+    
+    @action(detail=False, methods=['get'])
+    def mes_abonnes(self, request):
+        """Liste de mes abonnés (pour les artistes)"""
+        if request.user.role != 'artiste':
+            return Response({'error': 'Seuls les artistes peuvent voir leurs abonnés'}, status=status.HTTP_403_FORBIDDEN)
+        
+        abonnes = Suivi.objects.filter(artiste=request.user)
+        serializer = self.get_serializer(abonnes, many=True)
+        return Response({
+            'count': abonnes.count(),
+            'abonnes': serializer.data
+        })
 
 # ===== VUES SPOTIFY OAUTH =====
 
@@ -993,3 +1100,4 @@ def spotify_callback(request):
         import traceback
         traceback.print_exc()
         return HttpResponseRedirect(f"{settings.FRONTEND_URL}/galeries?error=spotify_callback_failed")
+
