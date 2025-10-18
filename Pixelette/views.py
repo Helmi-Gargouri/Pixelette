@@ -1456,645 +1456,501 @@ def users_by_date(request):
 @api_view(['POST'])
 @permission_classes([IsAdminOrSession])
 def generate_summary_pdf(request):
-    """Generate a PDF summary of dashboard data and save it under MEDIA_ROOT/reports/.
-
-    Returns JSON: { report_url: <url> }
-    """
+    """Generate an enhanced PDF summary of dashboard data with modern design and comprehensive content."""
     import io, os, datetime
     from django.conf import settings
     from django.urls import reverse
 
-    # Gather summary data
-    galeries = list(Galerie.objects.all())
-    oeuvres = list(Oeuvre.objects.all())
+    # Get report configuration from request
+    config = request.data.get('config', {})
+    include_charts = config.get('include_charts', True)
+    include_details = config.get('include_details', True)
+    date_range = config.get('date_range', 'month')
+    report_format = config.get('format', 'pdf')
 
+    # Calculate date ranges based on selection
+    # Use Django timezone-aware now to avoid naive datetime warnings when USE_TZ=True
+    now = timezone.now()
+    date_ranges = {
+        'week': datetime.timedelta(days=7),
+        'month': datetime.timedelta(days=30),
+        'quarter': datetime.timedelta(days=90),
+        'year': datetime.timedelta(days=365),
+        'all': None
+    }
+    
+    delta = date_ranges.get(date_range, datetime.timedelta(days=30))
+    since_date = now - delta if delta else None
+
+    # Gather comprehensive data with date filtering
+    galeries_qs = Galerie.objects.all()
+    oeuvres_qs = Oeuvre.objects.all()
+    utilisateurs_qs = Utilisateur.objects.all()
+
+    if since_date:
+        galeries_qs = galeries_qs.filter(date_creation__gte=since_date)
+        oeuvres_qs = oeuvres_qs.filter(date_creation__gte=since_date)
+        utilisateurs_qs = utilisateurs_qs.filter(date_inscription__gte=since_date)
+
+    galeries = list(galeries_qs)
+    oeuvres = list(oeuvres_qs)
+    utilisateurs = list(utilisateurs_qs)
+
+    # Enhanced statistics
     galeries_pub = sum(1 for g in galeries if not g.privee)
     galeries_pri = sum(1 for g in galeries if g.privee)
     total_oeuvres = len(oeuvres)
+    total_utilisateurs = len(utilisateurs)
+    
+    # Calculate views statistics
+    total_galeries_views = sum(g.vues or 0 for g in galeries)
+    total_oeuvres_views = sum(o.vues or 0 for o in oeuvres)
+    total_views = total_galeries_views + total_oeuvres_views
 
-    # Top galleries by vues
+    # Top content with enhanced data
     top_galeries = Galerie.objects.order_by('-vues')[:10]
     top_oeuvres = Oeuvre.objects.order_by('-vues')[:10]
 
-    # Views per artist (reuse logic)
-    from django.db.models import Sum, F
+    # Enhanced artist statistics
+    from django.db.models import Sum, F, Count
     from django.db.models.functions import Coalesce
+    
     artists_qs = Utilisateur.objects.annotate(
         total_oeuvre_views=Coalesce(Sum('oeuvres__vues'), 0),
         total_galerie_views=Coalesce(Sum('galeries__vues'), 0),
-    ).annotate(total_views=F('total_oeuvre_views') + F('total_galerie_views')).order_by('-total_views')[:20]
+        oeuvres_count=Count('oeuvres'),
+        galeries_count=Count('galeries')
+    ).annotate(
+        total_views=F('total_oeuvre_views') + F('total_galerie_views'),
+        total_content=F('oeuvres_count') + F('galeries_count')
+    ).filter(total_views__gt=0).order_by('-total_views')[:15]
 
-    # Prepare textual summary
-    summary_lines = []
-    summary_lines.append(f"Rapport résumé — {datetime.datetime.utcnow().isoformat()}Z")
-    summary_lines.append("")
-    summary_lines.append(f"Galeries publiques: {galeries_pub}")
-    summary_lines.append(f"Galeries privées: {galeries_pri}")
-    summary_lines.append(f"Total œuvres: {total_oeuvres}")
-    summary_lines.append("")
-    summary_lines.append("Top Galeries (vues):")
-    for g in top_galeries:
-        summary_lines.append(f" - {g.nom} : {g.vues}")
-    summary_lines.append("")
-    summary_lines.append("Top Œuvres (vues):")
-    for o in top_oeuvres:
-        summary_lines.append(f" - {o.titre} : {o.vues}")
-    summary_lines.append("")
-    summary_lines.append("Top Artistes (vues totales):")
-    for a in artists_qs:
-        summary_lines.append(f" - {a.prenom} {a.nom} : {a.total_views}")
+    # Engagement metrics
+    avg_views_per_galerie = total_galeries_views / len(galeries) if galeries else 0
+    avg_views_per_oeuvre = total_oeuvres_views / len(oeuvres) if oeuvres else 0
+    oeuvres_per_galerie = total_oeuvres / len(galeries) if galeries else 0
 
-    # Ensure reports dir
+    # Ensure reports directory exists
     reports_dir = os.path.join(settings.MEDIA_ROOT, 'reports')
     os.makedirs(reports_dir, exist_ok=True)
 
-    # Filename
-    filename_ts = datetime.datetime.utcnow().strftime('%Y%m%dT%H%M%SZ')
-    pdf_filename = f"dashboard_summary_{filename_ts}.pdf"
+    # Enhanced filename with configuration
+    # Use an ISO-like UTC timestamp for filenames using timezone-aware datetime
+    try:
+        filename_ts = now.astimezone(datetime.timezone.utc).strftime('%Y%m%dT%H%M%SZ')
+    except Exception:
+        # Fallback if astimezone is not available for some reason
+        filename_ts = now.strftime('%Y%m%dT%H%M%SZ')
+    range_suffix = f"-{date_range}" if date_range != 'all' else ''
+    pdf_filename = f"rapport-pixelette-{filename_ts}{range_suffix}.pdf"
     pdf_path = os.path.join(reports_dir, pdf_filename)
 
-    # Try to use reportlab to render a nicer PDF (with simple charts). If reportlab
-    # is not installed or an error occurs, fallback to a plain text file.
     try:
         from reportlab.lib.pagesizes import A4
         from reportlab.pdfgen import canvas
         from reportlab.lib import colors
         from reportlab.lib.units import mm
         from reportlab.lib.utils import ImageReader
-        # Force a non-interactive backend to avoid Tkinter / GUI issues when
-        # generating charts from a web thread/process (prevents the
-        # "Starting a Matplotlib GUI outside of the main thread" warnings).
+        from reportlab.pdfbase import pdfmetrics
+        from reportlab.pdfbase.ttfonts import TTFont
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
+        
+        # Try to register better fonts if available
+        try:
+            # You might need to add these font files to your project
+            pdfmetrics.registerFont(TTFont('DejaVuSans', 'DejaVuSans.ttf'))
+            pdfmetrics.registerFont(TTFont('DejaVuSans-Bold', 'DejaVuSans-Bold.ttf'))
+        except:
+            pass  # Use default fonts
+
+        # Force non-interactive backend for matplotlib
         try:
             import matplotlib
             matplotlib.use('Agg')
             import matplotlib.pyplot as plt
+            import numpy as np
         except Exception:
-            # If matplotlib can't be configured, fallback and continue; the
-            # PDF generator will simply omit charts (text-only fallback remains).
             plt = None
 
         buffer = io.BytesIO()
-        c = canvas.Canvas(buffer, pagesize=A4)
-        width, height = A4
+        doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=20, bottomMargin=20)
+        styles = getSampleStyleSheet()
+        story = []
 
-        # tiny helper to wrap text
-        def draw_wrapped_text(x, y, text, font_name='Helvetica', font_size=10, leading=14, max_width=width - 80):
-            c.setFont(font_name, font_size)
-            words = text.split()
-            line = ''
-            cur_y = y
-            for w in words:
-                test = (line + ' ' + w).strip()
-                if c.stringWidth(test, font_name, font_size) > max_width:
-                    c.drawString(x, cur_y, line)
-                    cur_y -= leading
-                    line = w
-                else:
-                    line = test
-            if line:
-                c.drawString(x, cur_y, line)
-                cur_y -= leading
-            return cur_y
-
-        # sanitize text helper: normalize whitespace, fix stray punctuation and ensure short sentences
-        def sanitize_text(t):
-            if not t:
-                return ''
-            s = str(t)
-            # Replace newlines and multiple spaces with single space
-            s = ' '.join(s.replace('\r', ' ').replace('\n', ' ').split())
-            # Normalize bullets and separators
-            s = s.replace('•', ' • ')
-            s = ' '.join(s.split())
-            # Fix common typos like 'Vuezdada' or 'Vuez' by ensuring 'Vues:' token is present when a number exists
-            # If pattern like 'Vues' followed by non-digit, remove the garbage
-            s = s.replace('Vuezdada', '')
-            # Ensure sentence ends with a period for nicer wrapping (only if short)
-            if len(s) < 300 and not s.endswith('.') and not s.endswith('…'):
-                s = s.rstrip() + '.'
-            return s
-
-        # Chart helpers using matplotlib -> return ImageReader
-        def make_pie(pub_count, pri_count):
-            try:
-                fig, ax = plt.subplots(figsize=(3, 3), dpi=100)
-                sizes = [pub_count, pri_count]
-                labels = ['Publiques', 'Privées']
-                colors_list = ['#4CAF50', '#FF7043']
-                ax.pie(sizes, labels=labels, colors=colors_list, autopct='%1.0f%%', startangle=140, textprops={'fontsize': 9})
-                ax.axis('equal')
-                buf = io.BytesIO()
-                plt.tight_layout()
-                fig.savefig(buf, format='png', bbox_inches='tight', dpi=150)
-                plt.close(fig)
-                buf.seek(0)
-                return ImageReader(buf)
-            except Exception:
-                return None
-
-        def make_bar(names, values, title='', max_items=8):
-            try:
-                names = names[:max_items]
-                values = values[:max_items]
-                fig, ax = plt.subplots(figsize=(6, 3), dpi=100)
-                y_pos = range(len(names))[::-1]
-                ax.barh(range(len(names))[::-1], values, color='#1976D2')
-                ax.set_yticks(range(len(names))[::-1])
-                ax.set_yticklabels([n if len(n) < 30 else n[:27] + '...' for n in names])
-                ax.set_xlabel('Vues')
-                ax.set_title(title)
-                plt.tight_layout()
-                buf = io.BytesIO()
-                fig.savefig(buf, format='png', bbox_inches='tight', dpi=150)
-                plt.close(fig)
-                buf.seek(0)
-                return ImageReader(buf)
-            except Exception:
-                return None
-
-        # Cover page
-        c.setFillColor(colors.HexColor('#0f172a'))
-        c.rect(0, 0, width, height, stroke=0, fill=1)
-        c.setFillColor(colors.white)
-        c.setFont('Helvetica-Bold', 28)
-        c.drawCentredString(width / 2, height - 120, 'Rapport résumé — Pixelette')
-        c.setFont('Helvetica', 12)
-        c.drawCentredString(width / 2, height - 145, f"Généré le: {datetime.datetime.utcnow().isoformat()}Z")
-        c.setFont('Helvetica', 10)
-        c.drawCentredString(width / 2, height - 165, f"Galeries publiques: {galeries_pub} • Galeries privées: {galeries_pri} • Œuvres: {total_oeuvres}")
-        c.showPage()
-
-        # Main content page
-        y = height - 40
-        c.setFillColor(colors.black)
-
-        # --- Welcome top summary (big banner + metrics) ---
-        c.setFont('Helvetica-Bold', 20)
-        c.drawString(40, y, 'Bienvenue sur Pixelette 🎨')
-        y -= 26
-        c.setFont('Helvetica', 11)
-        welcome_text = f"Votre plateforme de gestion d'œuvres d'art et de galeries. Actuellement, vous gérez {total_oeuvres} œuvres réparties dans {len(galeries)} galeries."
-        y = draw_wrapped_text(40, y, welcome_text, font_size=11, leading=14, max_width=width - 80)
-        y -= 8
-
-        # Compute simple month-over-month deltas for display
-        now = datetime.datetime.utcnow()
-        delta_days = 30
-        try:
-            since = now - datetime.timedelta(days=delta_days)
-            prev_since = now - datetime.timedelta(days=delta_days * 2)
-            oeuvres_last = Oeuvre.objects.filter(date_creation__gte=since).count()
-            oeuvres_prev = Oeuvre.objects.filter(date_creation__gte=prev_since, date_creation__lt=since).count()
-            galeries_last = Galerie.objects.filter(date_creation__gte=since).count()
-            galeries_prev = Galerie.objects.filter(date_creation__gte=prev_since, date_creation__lt=since).count()
-            users_last = Utilisateur.objects.filter(date_inscription__gte=since).count()
-            users_prev = Utilisateur.objects.filter(date_inscription__gte=prev_since, date_inscription__lt=since).count()
-        except Exception:
-            oeuvres_last = oeuvres_prev = galeries_last = galeries_prev = users_last = users_prev = 0
-
-        def pct(new, old):
-            try:
-                if old == 0:
-                    return None
-                return round(((new - old) / old) * 100, 1)
-            except Exception:
-                return None
-
-        oeuvres_delta = pct(oeuvres_last, oeuvres_prev)
-        galeries_delta = pct(galeries_last, galeries_prev)
-        users_delta = pct(users_last, users_prev)
-
-        total_galeries = len(galeries)
-        galeries_pub_count = galeries_pub
-        avg_oeuvres_per_galerie = round((total_oeuvres / total_galeries) if total_galeries else 0, 1)
-
-        # Draw metric cards (simple grid)
-        box_x = 40
-        box_w = (width - 80)
-        card_h = 56
-        # We'll draw four small cards stacked horizontally when space allows
-        card_w = (box_w - 24) / 4
-
-        metrics = [
-            (str(total_oeuvres), f'Œuvres', oeuvres_delta),
-            (str(total_galeries), f'Galeries', galeries_delta),
-            (str(avg_oeuvres_per_galerie), f'Moyenne œuvres/galerie', None),
-            (str(Utilisateur.objects.count()), f'Utilisateurs', users_delta),
-        ]
-
-        cx = box_x
-        cy = y
-        c.setFont('Helvetica-Bold', 18)
-        for val, label, delta in metrics:
-            # Card background
-            c.setFillColor(colors.whitesmoke)
-            c.rect(cx - 6, cy - card_h, card_w + 12, card_h, stroke=0, fill=1)
-            c.setFillColor(colors.black)
-            # Value
-            c.setFont('Helvetica-Bold', 16)
-            c.drawString(cx, cy - 18, val)
-            # Label
-            c.setFont('Helvetica', 9)
-            c.drawString(cx, cy - 34, label)
-            # Delta if available
-            if delta is not None:
-                try:
-                    delta_text = f"{delta:+.1f}% ce mois"
-                    c.setFont('Helvetica', 8)
-                    c.setFillColor(colors.HexColor('#16a34a') if delta >= 0 else colors.red)
-                    c.drawString(cx + card_w - 60, cy - 18, delta_text)
-                    c.setFillColor(colors.black)
-                except Exception:
-                    pass
-
-            cx += card_w + 8
-
-        y = cy - card_h - 12
-
-        # Small CTA line
-        c.setFont('Helvetica-Bold', 11)
-        c.drawString(40, y, 'Voir les œuvres')
-        y -= 22
-
-        # Continue with the rest of the synthese
-        c.setFont('Helvetica-Bold', 16)
-        c.drawString(40, y, 'Synthèse')
-        y -= 22
-
-        # AI or template summary
-        ai_summary = None
-        try:
-            prompt_lines = [
-                "Please write a short, friendly French summary (3-4 sentences) of the following dashboard data:",
-                f"Galeries publiques: {galeries_pub}",
-                f"Galeries privées: {galeries_pri}",
-                f"Total œuvres: {total_oeuvres}",
-                "Top galeries (name: views):",
-            ]
-            for g in top_galeries[:5]:
-                prompt_lines.append(f"- {g.nom}: {g.vues}")
-            prompt_lines.append("Top œuvres (name: views):")
-            for o in top_oeuvres[:5]:
-                prompt_lines.append(f"- {o.titre}: {o.vues}")
-
-            prompt = '\n'.join(prompt_lines)
-            ai_summary = generate_ai_text(prompt, max_tokens=250, temperature=0.7)
-        except Exception:
-            ai_summary = None
-
-        if not ai_summary:
-            # Local template fallback
-            ai_summary = (
-                f"Au total, cette période présente {galeries_pub} galeries publiques et {galeries_pri} galeries privées, "
-                f"regroupant {total_oeuvres} œuvres. Les galeries les plus vues sont {', '.join([g.nom for g in top_galeries[:3]])}.")
-
-        c.setFont('Helvetica', 11)
-        y = draw_wrapped_text(40, y, ai_summary, font_size=11, leading=15)
-        y -= 10
-
-        # Insert pie chart for public/private
-        pie_img = make_pie(galeries_pub, galeries_pri)
-        if pie_img:
-            c.drawImage(pie_img, width - 220, y - 160, width=160, height=160)
-
-        # Top galleries bar chart
-        gal_names = [g.nom for g in top_galeries]
-        gal_vals = [int(g.vues) for g in top_galeries]
-        gal_img = make_bar(gal_names, gal_vals, title='Top Galeries')
-        if gal_img:
-            c.drawImage(gal_img, 40, y - 200, width=width - 300, height=160)
-            y -= 200
-        else:
-            # fallback textual list
-            c.setFont('Helvetica-Bold', 12)
-            c.drawString(40, y, 'Top Galeries (vues)')
-            y -= 18
-            c.setFont('Helvetica', 10)
-            for g in top_galeries[:15]:
-                c.drawString(50, y, f"- {g.nom} : {g.vues}")
-                y -= 14
-                if y < 80:
-                    c.showPage()
-                    y = height - 40
-
-        # Per-item detailed paragraphs (top 5 galleries and top 5 oeuvres)
-        def generate_item_summaries_for_galleries(galeries_list):
-            summaries = []
-            try:
-                prompt = 'Génère pour chaque galerie ci-dessous une courte description en français (1-2 phrases) qui met en avant le thème, l\'ambiance et pourquoi elle attire des vues. Sépare chaque description par "###".\n\n'
-                for g in galeries_list[:10]:
-                    desc = g.description or ''
-                    theme = g.theme or ''
-                    owner = f"{g.proprietaire.prenom} {g.proprietaire.nom}" if getattr(g, 'proprietaire', None) else ''
-                    prompt += f"Galerie: {g.nom}\nDescription: {desc}\nThème: {theme}\nPropriétaire: {owner}\nVues: {g.vues}\n---\n"
-                text = generate_ai_text(prompt, max_tokens=800, temperature=0.7)
-                if text:
-                    parts = [p.strip() for p in text.split('###') if p.strip()]
-                    for i, g in enumerate(galeries_list[:len(parts)]):
-                        summaries.append(parts[i])
-            except Exception:
-                summaries = []
-
-            # fallback to simple template for any missing summaries
-            for i, g in enumerate(galeries_list[:5]):
-                if i < len(summaries):
-                    continue
-                desc = g.description or 'Aucune description fournie.'
-                theme = g.theme or 'Thème non spécifié.'
-                owner = f"{g.proprietaire.prenom} {g.proprietaire.nom}" if getattr(g, 'proprietaire', None) else 'Propriétaire inconnu.'
-                summaries.append(f"{g.nom} — {desc} Propriétaire: {owner}. Thème: {theme}. Vues: {g.vues}.")
-            return summaries
-
-        def generate_item_summaries_for_oeuvres(oeuvres_list):
-            summaries = []
-            try:
-                prompt = 'Génère pour chaque œuvre ci-dessous une courte description en français (1-2 phrases) qui décrit l\'œuvre, le style et pourquoi elle attire des vues. Sépare chaque description par "###".\n\n'
-                for o in oeuvres_list[:10]:
-                    desc = o.description or ''
-                    author = f"{o.auteur.prenom} {o.auteur.nom}" if getattr(o, 'auteur', None) else ''
-                    prompt += f"Oeuvre: {o.titre}\nDescription: {desc}\nAuteur: {author}\nVues: {o.vues}\n---\n"
-                text = generate_ai_text(prompt, max_tokens=800, temperature=0.7)
-                if text:
-                    parts = [p.strip() for p in text.split('###') if p.strip()]
-                    for i, o in enumerate(oeuvres_list[:len(parts)]):
-                        summaries.append(parts[i])
-            except Exception:
-                summaries = []
-
-            for i, o in enumerate(oeuvres_list[:5]):
-                if i < len(summaries):
-                    continue
-                desc = o.description or 'Aucune description fournie.'
-                author = f"{o.auteur.prenom} {o.auteur.nom}" if getattr(o, 'auteur', None) else 'Auteur inconnu.'
-                summaries.append(f"{o.titre} — {desc} Auteur: {author}. Vues: {o.vues}.")
-            return summaries
-
-        # Generate summaries
-        gallery_summaries = generate_item_summaries_for_galleries(list(top_galeries))
-        oeuvre_summaries = generate_item_summaries_for_oeuvres(list(top_oeuvres))
-
-        # Détails des galeries: description + render as a two-column grid of cards
-        y -= 10
-        # Section description (sanitized)
-        galeries_section_desc = sanitize_text(
-            "Cette section présente les galeries les plus visibles de la plateforme. Chaque carte contient le propriétaire, le thème, le nombre de vues et une courte description pour mieux comprendre pourquoi la galerie attire des visiteurs."
+        # Custom styles
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=24,
+            textColor=colors.HexColor('#1e40af'),
+            spaceAfter=30,
+            alignment=TA_CENTER
         )
-        c.setFont('Helvetica', 10)
-        y = draw_wrapped_text(40, y, galeries_section_desc, font_size=10, leading=13, max_width=width - 80)
-        y -= 8
-        c.setFont('Helvetica-Bold', 12)
-        c.drawString(40, y, 'Détails des galeries')
-        y -= 18
 
-        cols = 2
-        gap = 12
-        card_w = (width - 80 - gap) / cols
-        card_h = 140
-        x_start = 40
+        heading_style = ParagraphStyle(
+            'CustomHeading',
+            parent=styles['Heading2'],
+            fontSize=16,
+            textColor=colors.HexColor('#374151'),
+            spaceAfter=12,
+            spaceBefore=20
+        )
 
-        c.setFont('Helvetica', 10)
-        galeries_to_show = list(top_galeries[:12])
-        for i, g in enumerate(galeries_to_show):
-            col = i % cols
-            row = i // cols
-            x = x_start + col * (card_w + gap)
-            y_row_top = y - row * (card_h + 16)
+        subheading_style = ParagraphStyle(
+            'CustomSubheading',
+            parent=styles['Heading3'],
+            fontSize=12,
+            textColor=colors.HexColor('#6b7280'),
+            spaceAfter=8
+        )
 
-            # Start a new page if this row would overflow
-            if y_row_top - card_h < 60:
-                c.showPage()
-                y = height - 40
-                row = 0
-                x = x_start + col * (card_w + gap)
-                y_row_top = y - row * (card_h + 16)
+        # Cover Page
+        cover_elements = []
+        
+        # Title
+        cover_elements.append(Paragraph("RAPPORT D'ACTIVITÉ", title_style))
+        cover_elements.append(Spacer(1, 20))
+        
+        # Platform name with styling
+        platform_style = ParagraphStyle(
+            'Platform',
+            parent=styles['Normal'],
+            fontSize=18,
+            textColor=colors.HexColor('#7c3aed'),
+            alignment=TA_CENTER,
+            spaceAfter=30
+        )
+        cover_elements.append(Paragraph("Pixelette 🎨", platform_style))
+        
+        # Date and period info
+        period_names = {
+            'week': '7 derniers jours',
+            'month': '30 derniers jours',
+            'quarter': '3 derniers mois',
+            'year': '12 derniers mois',
+            'all': 'Toute la période'
+        }
+        period_text = period_names.get(date_range, '30 derniers jours')
+        
+        date_style = ParagraphStyle(
+            'DateInfo',
+            parent=styles['Normal'],
+            fontSize=10,
+            textColor=colors.HexColor('#6b7280'),
+            alignment=TA_CENTER,
+            spaceAfter=40
+        )
+        cover_elements.append(Paragraph(f"Période: {period_text}", date_style))
+        cover_elements.append(Paragraph(f"Généré le: {now.strftime('%d/%m/%Y à %H:%M')}", date_style))
+        
+        # Key metrics table for cover
+        metrics_data = [
+            ['📊 MÉTRIQUES PRINCIPALES', ''],
+            [f"{total_oeuvres}", 'Œuvres totales'],
+            [f"{len(galeries)}", 'Galeries actives'],
+            [f"{total_utilisateurs}", 'Utilisateurs'],
+            [f"{total_views:,}", 'Vues totales']
+        ]
+        
+        metrics_table = Table(metrics_data, colWidths=[100, 200])
+        metrics_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#3b82f6')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 12),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 1), (-1, -1), 14),
+            ('FONTSIZE', (1, 1), (1, -1), 10),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f8fafc')]),
+            ('GRID', (0, 0), (-1, -1), 1, colors.lightgrey),
+        ]))
+        
+        cover_elements.append(Spacer(1, 50))
+        cover_elements.append(metrics_table)
+        cover_elements.append(Spacer(1, 30))
 
-            # Draw card border
-            c.setStrokeColor(colors.lightgrey)
-            c.rect(x, y_row_top - card_h, card_w, card_h, stroke=1, fill=0)
+        # Executive Summary Section
+        executive_style = ParagraphStyle(
+            'Executive',
+            parent=styles['Normal'],
+            fontSize=11,
+            textColor=colors.HexColor('#374151'),
+            alignment=TA_LEFT,
+            spaceAfter=12,
+            leading=14
+        )
 
-            # Thumbnail: use the first artwork image from the gallery if available
-            thumb_w = 100
-            thumb_h = 100
-            thumb_x = x + 8
-            thumb_y = y_row_top - 12 - thumb_h
-            thumb = None
+        summary_text = f"""
+        Ce rapport présente une analyse complète de l'activité sur la plateforme Pixelette 
+        sur la période des {period_text}. La plateforme démontre une croissance constante avec 
+        {total_oeuvres} œuvres partagées à travers {len(galeries)} galeries, générant un total 
+        de {total_views:,} vues. L'engagement des utilisateurs reste élevé avec une moyenne de 
+        {avg_views_per_oeuvre:.1f} vues par œuvre.
+        """
+        
+        cover_elements.append(Paragraph("SYNTHÈSE EXÉCUTIVE", heading_style))
+        cover_elements.append(Paragraph(summary_text, executive_style))
+
+        # Add cover to story
+        story.extend(cover_elements)
+        story.append(Spacer(1, 20))
+
+        # DETAILED ANALYSIS PAGE
+        story.append(Paragraph("ANALYSE DÉTAILLÉE", title_style))
+
+        # Key Performance Indicators
+        story.append(Paragraph("INDICATEURS CLÉS DE PERFORMANCE", heading_style))
+        
+        kpi_data = [
+            ['MÉTRIQUE', 'VALEUR', 'CONTEXTE'],
+            ['Œuvres totales', f"{total_oeuvres}", f"{oeuvres_per_galerie:.1f} par galerie"],
+            ['Galeries actives', f"{len(galeries)}", f"{galeries_pub} publiques, {galeries_pri} privées"],
+            ['Vues totales', f"{total_views:,}", f"Galeries: {total_galeries_views:,}, Œuvres: {total_oeuvres_views:,}"],
+            ['Utilisateurs actifs', f"{total_utilisateurs}", f"Période: {period_text}"],
+            ['Vues moyennes/œuvre', f"{avg_views_per_oeuvre:.1f}", "Engagement moyen par contenu"],
+            ['Vues moyennes/galerie', f"{avg_views_per_galerie:.1f}", "Performance des espaces"]
+        ]
+        
+        kpi_table = Table(kpi_data, colWidths=[150, 80, 200])
+        kpi_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1e40af')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 10),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 1), (-1, -1), 9),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f8fafc')]),
+            ('GRID', (0, 0), (-1, -1), 1, colors.lightgrey),
+        ]))
+        
+        story.append(kpi_table)
+        story.append(Spacer(1, 20))
+
+        # Top Performers Section
+        story.append(Paragraph("CONTENU PERFORMANT", heading_style))
+
+        # Top Galleries Table
+        story.append(Paragraph("Top 10 Galeries par Vues", subheading_style))
+        
+        gallery_data = [['POS', 'GALERIE', 'VUES', 'TYPE', 'ŒUVRES']]
+        for i, gallery in enumerate(top_galeries[:10], 1):
+            gallery_type = "Publique" if not gallery.privee else "Privée"
+            oeuvres_count = gallery.oeuvres.count() if hasattr(gallery, 'oeuvres') else 'N/A'
+            gallery_data.append([
+                str(i),
+                gallery.nom[:30] + '...' if len(gallery.nom) > 30 else gallery.nom,
+                f"{gallery.vues:,}",
+                gallery_type,
+                str(oeuvres_count)
+            ])
+        
+        gallery_table = Table(gallery_data, colWidths=[30, 150, 60, 50, 40])
+        gallery_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#10b981')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 9),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 1), (-1, -1), 8),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f0fdf4')]),
+            ('GRID', (0, 0), (-1, -1), 1, colors.lightgrey),
+        ]))
+        
+        story.append(gallery_table)
+        story.append(Spacer(1, 15))
+
+        # Top Artworks Table
+        story.append(Paragraph("Top 10 Œuvres par Vues", subheading_style))
+        
+        artwork_data = [['POS', 'ŒUVRE', 'ARTISTE', 'VUES', 'GALERIE']]
+        for i, artwork in enumerate(top_oeuvres[:10], 1):
+            artist_name = f"{artwork.auteur.prenom} {artwork.auteur.nom}" if artwork.auteur else "Inconnu"
+            # Galerie relationship may be ManyToMany (related_name='galeries_associees') or older 'galerie' FK
+            gallery_name = 'Aucune'
             try:
-                first_oeuvre = g.oeuvres.first()
-                if first_oeuvre and getattr(first_oeuvre, 'image', None) and getattr(first_oeuvre.image, 'path', None):
-                    thumb = ImageReader(open(first_oeuvre.image.path, 'rb'))
+                # If there's a direct attribute 'galerie' (older schema), use it
+                if hasattr(artwork, 'galerie') and getattr(artwork, 'galerie'):
+                    g = getattr(artwork, 'galerie')
+                    gallery_name = g.nom if getattr(g, 'nom', None) else 'Aucune'
+                else:
+                    # Otherwise, check the related_name on Galerie (ManyToMany)
+                    if hasattr(artwork, 'galeries_associees'):
+                        rel_qs = artwork.galeries_associees.all()
+                        if rel_qs.exists():
+                            g = rel_qs.first()
+                            gallery_name = g.nom if getattr(g, 'nom', None) else 'Aucune'
             except Exception:
-                thumb = None
+                gallery_name = 'Aucune'
 
-            if thumb:
-                try:
-                    c.drawImage(thumb, thumb_x, thumb_y, width=thumb_w, height=thumb_h, preserveAspectRatio=True, anchor='sw')
-                except Exception:
-                    thumb = None
+            artwork_data.append([
+                str(i),
+                artwork.titre[:25] + '...' if len(artwork.titre) > 25 else artwork.titre,
+                artist_name[:20] + '...' if len(artist_name) > 20 else artist_name,
+                f"{artwork.vues:,}",
+                gallery_name[:15] + '...' if len(gallery_name) > 15 else gallery_name
+            ])
+        
+        artwork_table = Table(artwork_data, colWidths=[30, 100, 80, 50, 70])
+        artwork_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#f59e0b')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 9),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 1), (-1, -1), 8),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#fffbeb')]),
+            ('GRID', (0, 0), (-1, -1), 1, colors.lightgrey),
+        ]))
+        
+        story.append(artwork_table)
+        story.append(Spacer(1, 20))
 
-            # Text area
-            text_x = x + thumb_w + 18 if thumb else x + 12
-            text_y = y_row_top - 18
-            title = (g.nom or 'Sans nom')
-            owner = f"{g.proprietaire.prenom} {g.proprietaire.nom}" if getattr(g, 'proprietaire', None) else 'Propriétaire inconnu'
-            theme = g.theme or 'Thème non spécifié'
-            views = int(getattr(g, 'vues', 0) or 0)
+        # Artist Performance Section
+        story.append(Paragraph("PERFORMANCE DES ARTISTES", heading_style))
+        
+        artist_data = [['ARTISTE', 'VUES TOTALES', 'ŒUVRES', 'GALERIES', 'SCORE']]
+        for artist in artists_qs[:10]:
+            score = (artist.total_views / max(1, artist.total_content)) if artist.total_content > 0 else 0
+            artist_data.append([
+                f"{artist.prenom} {artist.nom}"[:25] + '...' if len(f"{artist.prenom} {artist.nom}") > 25 else f"{artist.prenom} {artist.nom}",
+                f"{artist.total_views:,}",
+                str(artist.oeuvres_count),
+                str(artist.galeries_count),
+                f"{score:.1f}"
+            ])
+        
+        artist_table = Table(artist_data, colWidths=[120, 60, 40, 40, 40])
+        artist_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#8b5cf6')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 9),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 1), (-1, -1), 8),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#faf5ff')]),
+            ('GRID', (0, 0), (-1, -1), 1, colors.lightgrey),
+        ]))
+        
+        story.append(artist_table)
+        story.append(Spacer(1, 20))
 
-            # Title (wrapped and sanitized)
-            c.setFont('Helvetica-Bold', 11)
-            title_text = sanitize_text(title)
-            title_y = draw_wrapped_text(
-                text_x,
-                text_y,
-                title_text,
-                font_name='Helvetica-Bold',
-                font_size=11,
-                leading=13,
-                max_width=(card_w - (thumb_w + 36)) if thumb else (card_w - 24),
-            )
+        # Recommendations Section
+        story.append(Paragraph("RECOMMANDATIONS STRATÉGIQUES", heading_style))
+        
+        recommendations = [
+            "📈 **Focus sur le contenu performant** : Capitaliser sur les galeries et œuvres les plus populaires",
+            "🎯 **Développement des artistes émergents** : Mettre en avant les talents avec un fort potentiel",
+            "🔄 **Optimisation du référencement** : Améliorer la découvrabilité du contenu peu consulté",
+            "🤝 **Partenariats stratégiques** : Collaborer avec les artistes les plus influents",
+            "📊 **Analyse continue** : Surveiller les tendances d'engagement mensuellement"
+        ]
+        
+        for rec in recommendations:
+            story.append(Paragraph(rec, styles['Normal']))
+            story.append(Spacer(1, 8))
 
-            # Metadata line: owner • theme • vues (wrapped)
-            meta = f"Propriétaire: {owner} • Thème: {theme} • Vues: {views}"
-            meta = sanitize_text(meta)
-            c.setFont('Helvetica', 9)
-            meta_y = draw_wrapped_text(
-                text_x,
-                title_y,
-                meta,
-                font_name='Helvetica',
-                font_size=9,
-                leading=11,
-                max_width=(card_w - (thumb_w + 36)) if thumb else (card_w - 24),
-            )
+        # Build PDF
+        doc.build(story)
 
-            # Description (use generated summary if available), sanitized and wrapped
-            desc_idx = i if i < len(gallery_summaries) else None
-            raw_desc = gallery_summaries[desc_idx] if desc_idx is not None else (g.description or 'Aucune description fournie.')
-            desc_text = sanitize_text(raw_desc)
-            c.setFont('Helvetica', 9)
-            _ = draw_wrapped_text(
-                text_x,
-                meta_y,
-                desc_text,
-                font_name='Helvetica',
-                font_size=9,
-                leading=11,
-                max_width=(card_w - (thumb_w + 36)) if thumb else (card_w - 24),
-            )
+        # Validate buffer contains a PDF
+        buffer.seek(0)
+        content = buffer.getvalue()
+        if not content or not content.startswith(b'%PDF'):
+            # Something went wrong during PDF generation; raise to trigger fallback
+            raise Exception('PDF generation did not produce a valid PDF content')
 
-        # Adjust y after grid
-        rows_drawn = (len(galeries_to_show) + cols - 1) // cols
-        y = y - rows_drawn * (card_h + 16) - 20
+        # Write to file (atomic write)
+        tmp_path = pdf_path + '.tmp'
+        with open(tmp_path, 'wb') as f:
+            f.write(content)
+        os.replace(tmp_path, pdf_path)
 
-        # (Removed) per-œuvre paragraph list — to keep report concise we list top œuvres in the 'Top Œuvres' section below.
-
-        # Next page: Top Œuvres displayed as a two-column grid of cards
-        c.showPage()
-        y = height - 40
-        c.setFont('Helvetica-Bold', 14)
-        c.drawString(40, y, 'Top Œuvres')
-        y -= 24
-
-        cols = 2
-        gap = 12
-        card_w = (width - 80 - gap) / cols
-        card_h = 140
-        x_start = 40
-
-        c.setFont('Helvetica', 10)
-        oeuvres_to_show = list(top_oeuvres[:12])
-        for i, o in enumerate(oeuvres_to_show):
-            col = i % cols
-            row = i // cols
-            x = x_start + col * (card_w + gap)
-            y_row_top = y - row * (card_h + 16)
-
-            # Start a new page if this row would overflow
-            if y_row_top - card_h < 60:
-                c.showPage()
-                y = height - 40
-                row = 0
-                x = x_start + col * (card_w + gap)
-                y_row_top = y - row * (card_h + 16)
-
-            # Draw card border
-            c.setStrokeColor(colors.lightgrey)
-            c.rect(x, y_row_top - card_h, card_w, card_h, stroke=1, fill=0)
-
-            # Thumbnail (left side)
-            thumb_w = 100
-            thumb_h = 100
-            thumb_x = x + 8
-            thumb_y = y_row_top - 12 - thumb_h
-            thumb = None
-            try:
-                if getattr(o, 'image', None) and getattr(o.image, 'path', None):
-                    thumb = ImageReader(open(o.image.path, 'rb'))
-            except Exception:
-                thumb = None
-
-            if thumb:
-                try:
-                    c.drawImage(thumb, thumb_x, thumb_y, width=thumb_w, height=thumb_h, preserveAspectRatio=True, anchor='sw')
-                except Exception:
-                    thumb = None
-
-            # Text area (right side)
-            text_x = x + thumb_w + 18 if thumb else x + 12
-            text_y = y_row_top - 18
-            title = (o.titre or 'Sans titre')
-            author = f"{o.auteur.prenom} {o.auteur.nom}" if getattr(o, 'auteur', None) else 'Auteur inconnu'
-            views = int(getattr(o, 'vues', 0) or 0)
-
-            c.setFont('Helvetica-Bold', 11)
-            c.drawString(text_x, text_y, title[:60])
-            text_y -= 14
-            c.setFont('Helvetica', 9)
-            c.drawString(text_x, text_y, f"Auteur: {author} • Vues: {views}")
-            text_y -= 12
-
-            # Description paragraph (use generated summaries if available)
-            desc_idx = i if i < len(oeuvre_summaries) else None
-            desc_text = oeuvre_summaries[desc_idx] if desc_idx is not None else (o.description or 'Aucune description fournie.')
-            # Wrap description within card text area
-            max_desc_width = card_w - (thumb_w + 36) if thumb else card_w - 24
-            # Use a small helper to draw wrapped text at (text_x, text_y)
-            def _draw_desc(xpos, ypos, text_val):
-                nonlocal c
-                c.setFont('Helvetica', 9)
-                words = text_val.split()
-                line = ''
-                cur_y = ypos
-                for w in words:
-                    test = (line + ' ' + w).strip()
-                    if c.stringWidth(test, 'Helvetica', 9) > max_desc_width:
-                        c.drawString(xpos, cur_y, line)
-                        cur_y -= 12
-                        line = w
-                    else:
-                        line = test
-                if line:
-                    c.drawString(xpos, cur_y, line)
-                    cur_y -= 12
-                return cur_y
-
-            _draw_desc(text_x, text_y, desc_text)
-
-        # Move y down past the grid we just drew
-        rows_drawn = (len(oeuvres_to_show) + cols - 1) // cols
-        y = y - rows_drawn * (card_h + 16) - 20
-
-        # Artists bar chart (kept below)
-        artist_labels = [f"{a.prenom} {a.nom}" for a in artists_qs[:12]]
-        artist_values = [int(getattr(a, 'total_views') or 0) for a in artists_qs[:12]]
-        artist_img = make_bar(artist_labels, artist_values, title='Top Artistes', max_items=12)
-        if artist_img:
-            # Ensure we have space, otherwise new page
-            if y - 240 < 60:
-                c.showPage()
-                y = height - 40
-            c.drawImage(artist_img, 40, y - 220, width=width - 80, height=220)
-
-        c.save()
-
-        # write buffer to file
-        with open(pdf_path, 'wb') as f:
-            f.write(buffer.getvalue())
-
-        # If caller requested immediate download, return file as attachment
-        try_download = False
-        try:
-            # support both JSON body and form params
-            try_download = bool(request.data.get('download'))
-        except Exception:
-            try_download = str(request.GET.get('download', '')).lower() in ('1', 'true', 'yes')
-
+        # Handle download request
+        try_download = request.data.get('download', False)
         if try_download:
-            # stream the file back
             return FileResponse(open(pdf_path, 'rb'), as_attachment=True, filename=pdf_filename, content_type='application/pdf')
 
-        # otherwise return an absolute URL so the frontend opens the correct backend host
+        # Return URL
         report_url = request.build_absolute_uri(settings.MEDIA_URL + 'reports/' + pdf_filename)
-        return JsonResponse({'report_url': report_url})
+        return JsonResponse({
+            'report_url': report_url,
+            'filename': pdf_filename,
+            'generated_at': now.isoformat(),
+            'period': period_text,
+            'metrics': {
+                'oeuvres': total_oeuvres,
+                'galeries': len(galeries),
+                'utilisateurs': total_utilisateurs,
+                'vues': total_views
+            }
+        })
 
     except Exception as e:
-        # fallback: write text summary instead and return txt url
-        txt_filename = f"dashboard_summary_{filename_ts}.txt"
+        # Fallback to simple text report
+        import traceback
+        print(f"PDF generation error: {str(e)}")
+        print(traceback.format_exc())
+
+        # Create enhanced text summary
+        summary_lines = [
+            "RAPPORT D'ACTIVITÉ PIXELETTE",
+            "=" * 50,
+            f"Période: {period_names.get(date_range, '30 derniers jours')}",
+            f"Généré le: {now.strftime('%d/%m/%Y à %H:%M')}",
+            "",
+            "MÉTRIQUES PRINCIPALES:",
+            f"- Œuvres totales: {total_oeuvres}",
+            f"- Galeries actives: {len(galeries)} ({galeries_pub} publiques, {galeries_pri} privées)",
+            f"- Utilisateurs: {total_utilisateurs}",
+            f"- Vues totales: {total_views:,}",
+            f"- Vues moyennes par œuvre: {avg_views_per_oeuvre:.1f}",
+            "",
+            "TOP GALERIES:",
+        ]
+        
+        for i, gallery in enumerate(top_galeries[:10], 1):
+            summary_lines.append(f"{i}. {gallery.nom} - {gallery.vues:,} vues")
+        
+        summary_lines.extend([
+            "",
+            "TOP ŒUVRES:",
+        ])
+        
+        for i, artwork in enumerate(top_oeuvres[:10], 1):
+            summary_lines.append(f"{i}. {artwork.titre} - {artwork.vues:,} vues")
+        
+        summary_lines.extend([
+            "",
+            "RECOMMANDATIONS:",
+            "- Capitaliser sur le contenu performant",
+            "- Développer les artistes émergents",
+            "- Optimiser la découvrabilité"
+        ])
+
+        # Save text file
+        txt_filename = f"rapport-pixelette-{filename_ts}{range_suffix}.txt"
         txt_path = os.path.join(reports_dir, txt_filename)
+        
         with open(txt_path, 'w', encoding='utf-8') as f:
             f.write('\n'.join(summary_lines))
 
-        # If download requested, stream the text file
-        try_download = False
-        try:
-            try_download = bool(request.data.get('download'))
-        except Exception:
-            try_download = str(request.GET.get('download', '')).lower() in ('1', 'true', 'yes')
-
+        try_download = request.data.get('download', False)
         if try_download:
             return FileResponse(open(txt_path, 'rb'), as_attachment=True, filename=txt_filename, content_type='text/plain')
 
         report_url = request.build_absolute_uri(settings.MEDIA_URL + 'reports/' + txt_filename)
-        return JsonResponse({'report_url': report_url, 'warning': str(e)})
+        return JsonResponse({
+            'report_url': report_url,
+            'warning': 'PDF generation failed, text report provided',
+            'error': str(e)
+        })
 
 
 @api_view(['GET'])
