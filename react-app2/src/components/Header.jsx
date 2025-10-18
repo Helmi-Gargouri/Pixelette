@@ -123,15 +123,10 @@ const Header = () => {
                         </ul>
                       </li>
                     )}
-                    <li className="menu-item-has-children">
-                      <a href="#">Shop</a>
-                      <ul className="sub-menu">
-                        <li><Link to="/shop">Shop Grid</Link></li>
-                        <li><Link to="/shop-details">Shop Details</Link></li>
-                        <li><Link to="/blog">Blog Page</Link></li>
-                        <li><Link to="/blog-details">Blog Details</Link></li>
-                      </ul>
+                     <li className="menu-item-has-children">
+                      <Link to="/artistes">Artistes</Link>
                     </li>
+                 
                     <li>
                       <Link to="/contact">Contact</Link>
                     </li>
