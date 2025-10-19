@@ -65,16 +65,16 @@ const StatCard = ({ stat, onRefresh }) => {
 
   // Chart configuration based on type
   const { options, series, chartType } = useMemo(() => {
-  if (!data || data.error) return { options: {}, series: [], chartType: (stat.chart_type || 'pie').toLowerCase() }
+    if (!data || data.error) return { options: {}, series: [], chartType: (stat.chart_type || 'pie').toLowerCase() }
 
     const rawLabels = Array.isArray(data.labels) ? data.labels : []
     const rawValues = Array.isArray(data.values) ? data.values : []
     const numericValues = rawValues.map(v => Number.isFinite(Number(v)) ? Number(v) : 0)
     const labels = rawLabels.length ? rawLabels : numericValues.map((_, i) => `Item ${i + 1}`)
     
-  // Prefer chart_type returned by the compute endpoint (data.chart_type)
-  // Fall back to the saved stat.chart_type when absent.
-  const type = ((data && data.chart_type) ? String(data.chart_type) : stat.chart_type || 'pie').toLowerCase()
+    // Prefer chart_type returned by the compute endpoint (data.chart_type)
+    // Fall back to the saved stat.chart_type when absent.
+    const type = ((data && data.chart_type) ? String(data.chart_type) : stat.chart_type || 'pie').toLowerCase()
     let chartOptions = { 
       chart: { 
         id: `stat-${stat.id}`,
@@ -166,30 +166,89 @@ const StatCard = ({ stat, onRefresh }) => {
 
   const FullCalendarWrapper = ({ points }) => {
     const [localPoints, setLocalPoints] = useState(points || [])
+    const [currentView, setCurrentView] = useState('dayGridMonth')
     const counts = useMemo(() => new Map((localPoints || []).map(p => [p.date, p.value])), [localPoints])
     const allVals = (localPoints || []).map(p => p.value)
     const maxVal = Math.max(...allVals, 1)
     const fcRef = useRef(null)
     const lastRangeRef = useRef({ start: null, end: null })
 
+    // Calculate statistics for the current view
+    const stats = useMemo(() => {
+      const values = Array.from(counts.values()).filter(v => v > 0)
+      const total = values.reduce((sum, val) => sum + val, 0)
+      const average = values.length > 0 ? Math.round(total / values.length) : 0
+      const max = values.length > 0 ? Math.max(...values) : 0
+      
+      return { total, average, max, daysWithData: values.length }
+    }, [counts])
+
     const dayCellStyle = (info) => {
       const ds = info.date.toISOString().slice(0,10)
       const v = counts.get(ds) || 0
+      
+      // Clear any existing badges
+      const existingBadge = info.el.querySelector('.fc-count-badge')
+      if (existingBadge) existingBadge.remove()
+      
       if (v > 0) {
-        const t = Math.min(1, v / maxVal)
-        info.el.style.backgroundColor = `rgba(59,130,246, ${0.12 + 0.6 * t})`
-        info.el.style.position = 'relative'
-        const existing = info.el.querySelector('.fc-count-badge')
-        if (existing) existing.remove()
+        // Calculate intensity for gradient
+        const intensity = Math.min(1, v / maxVal)
+        
+        // Create beautiful gradient background based on intensity
+        info.el.style.background = `linear-gradient(135deg, 
+          rgba(59, 130, 246, ${0.08 + intensity * 0.2}) 0%, 
+          rgba(99, 102, 241, ${0.12 + intensity * 0.3}) 100%
+        )`
+        info.el.style.borderRadius = '8px'
+        info.el.style.margin = '2px'
+        info.el.style.border = `1px solid rgba(59, 130, 246, ${0.2 + intensity * 0.3})`
+        
+        // Create modern badge
         const badge = document.createElement('div')
         badge.className = 'fc-count-badge'
-        badge.textContent = String(v)
-        badge.style.cssText = 'position:absolute;right:6px;top:6px;font-size:12px;font-weight:600;color:#0f172a'
+        badge.textContent = v.toLocaleString()
+        
+        // Style the badge based on value intensity
+        const badgeStyles = [
+          'position: absolute',
+          'bottom: 4px',
+          'right: 4px',
+          'font-size: 10px',
+          'font-weight: 700',
+          'color: #1e40af',
+          'background: rgba(255, 255, 255, 0.95)',
+          'padding: 2px 6px',
+          'border-radius: 8px',
+          'box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1)',
+          'backdrop-filter: blur(4px)',
+          'border: 1px solid rgba(59, 130, 246, 0.3)',
+          'min-width: 20px',
+          'text-align: center',
+          'z-index: 10'
+        ].join(';')
+        
+        badge.style.cssText = badgeStyles
+        info.el.style.position = 'relative'
         info.el.appendChild(badge)
+        
+        // Add hover effect
+        info.el.style.transition = 'all 0.2s ease'
+        info.el.addEventListener('mouseenter', () => {
+          info.el.style.transform = 'scale(1.05)'
+          info.el.style.zIndex = '20'
+          info.el.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.3)'
+        })
+        info.el.addEventListener('mouseleave', () => {
+          info.el.style.transform = 'scale(1)'
+          info.el.style.zIndex = '1'
+          info.el.style.boxShadow = 'none'
+        })
       } else {
-        const existing = info.el.querySelector('.fc-count-badge')
-        if (existing) existing.remove()
-        info.el.style.backgroundColor = ''
+        info.el.style.background = ''
+        info.el.style.border = '1px solid transparent'
+        info.el.style.margin = '2px'
+        info.el.style.borderRadius = '8px'
       }
     }
 
@@ -209,34 +268,195 @@ const StatCard = ({ stat, onRefresh }) => {
       }
     }
 
+    const handleViewChange = (info) => {
+      setCurrentView(info.view.type)
+    }
+
+    // Custom header renderer for better styling
+    const customHeader = () => {
+      return (
+        <div className="flex items-center justify-between p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-t-xl border-b border-gray-200">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
+              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+            </div>
+            <div>
+              <h3 className="font-semibold text-gray-900">Calendrier d'activité</h3>
+              <p className="text-sm text-gray-600">Vue {currentView === 'dayGridMonth' ? 'mensuelle' : 'hebdomadaire'}</p>
+            </div>
+          </div>
+          
+          {/* Stats overview */}
+          <div className="flex gap-4 text-sm">
+            <div className="text-center">
+              <div className="font-bold text-blue-600">{stats.total.toLocaleString()}</div>
+              <div className="text-gray-500">Total</div>
+            </div>
+            <div className="text-center">
+              <div className="font-bold text-green-600">{stats.average.toLocaleString()}</div>
+              <div className="text-gray-500">Moyenne</div>
+            </div>
+            <div className="text-center">
+              <div className="font-bold text-purple-600">{stats.max.toLocaleString()}</div>
+              <div className="text-gray-500">Maximum</div>
+            </div>
+          </div>
+        </div>
+      )
+    }
+
     return (
       <div className="space-y-4">
-        <FullCalendar
-          ref={fcRef}
-          plugins={[dayGridPlugin, interactionPlugin]}
-          initialView="dayGridMonth"
-          dayCellDidMount={dayCellStyle}
-          datesSet={handleDatesSet}
-          headerToolbar={{ left: 'prev,next today', center: 'title', right: '' }}
-          dayMaxEventRows={3}
-          height={320}
-          dateClick={handleDayClick}
-        />
-        <div className="mt-2">
+        {/* Custom Header */}
+        {customHeader()}
+        
+        {/* Calendar Container */}
+        <div className="bg-white rounded-b-xl border border-gray-200 border-t-0">
+          <FullCalendar
+            ref={fcRef}
+            plugins={[dayGridPlugin, interactionPlugin]}
+            initialView="dayGridMonth"
+            dayCellDidMount={dayCellStyle}
+            datesSet={handleDatesSet}
+            viewDidMount={handleViewChange}
+            headerToolbar={{
+              left: 'prev,next',
+              center: 'title',
+              right: 'dayGridMonth,dayGridWeek today'
+            }}
+            dayMaxEventRows={3}
+            height={400}
+            dateClick={handleDayClick}
+            // Enhanced styling
+            dayHeaderClassNames="bg-gray-50 font-semibold text-gray-700 py-3"
+            dayCellClassNames="hover:bg-gray-50 transition-colors"
+            // Custom button text
+            buttonText={{
+              today: 'Aujourd\'hui',
+              month: 'Mois',
+              week: 'Semaine'
+            }}
+            // Custom styling
+            themeSystem="standard"
+            views={{
+              dayGridMonth: {
+                titleFormat: { year: 'numeric', month: 'long' }
+              },
+              dayGridWeek: {
+                titleFormat: { year: 'numeric', month: 'short', day: 'numeric' }
+              }
+            }}
+          />
+        </div>
+
+        {/* Enhanced Mini Chart */}
+        <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="font-semibold text-gray-900 text-sm">Évolution temporelle</h4>
+            <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
+              {localPoints.length} jours de données
+            </span>
+          </div>
           <Chart
             options={{
-              chart: { sparkline: { enabled: true }, toolbar: { show: false } },
-              stroke: { curve: 'smooth', width: 2 },
-              xaxis: { categories: (localPoints || []).map(p => p.date) },
-              markers: { size: 0 },
-              tooltip: { enabled: false },
-              legend: { show: false },
-              colors: ['#3b82f6']
+              chart: { 
+                sparkline: { enabled: true }, 
+                toolbar: { show: false },
+                fontFamily: 'inherit'
+              },
+              stroke: { 
+                curve: 'smooth', 
+                width: 3,
+                colors: ['#3b82f6']
+              },
+              fill: {
+                type: 'gradient',
+                gradient: {
+                  shade: 'light',
+                  type: 'vertical',
+                  shadeIntensity: 0.5,
+                  gradientToColors: ['#60a5fa'],
+                  opacityFrom: 0.8,
+                  opacityTo: 0.2
+                }
+              },
+              xaxis: { 
+                categories: (localPoints || []).map(p => {
+                  const date = new Date(p.date)
+                  return date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
+                }),
+                labels: { show: false }
+              },
+              yaxis: { show: false },
+              markers: { 
+                size: 4,
+                colors: ['#3b82f6'],
+                strokeColors: '#fff',
+                strokeWidth: 2,
+                hover: { size: 6 }
+              },
+              tooltip: { 
+                enabled: true,
+                theme: 'light',
+                y: {
+                  formatter: (value) => `${value} activité${value !== 1 ? 's' : ''}`
+                }
+              },
+              grid: {
+                show: false,
+                padding: {
+                  top: 0,
+                  right: 0,
+                  bottom: 0,
+                  left: 0
+                }
+              }
             }}
-            series={[{ name: stat.title || 'Series', data: (localPoints || []).map(p => p.value) }]}
-            type={'line'}
-            height={60}
+            series={[{ 
+              name: 'Activité', 
+              data: (localPoints || []).map(p => p.value) 
+            }]}
+            type={'area'}
+            height={80}
           />
+          
+          {/* Summary stats */}
+          <div className="flex justify-between items-center mt-3 pt-3 border-t border-gray-100">
+            <div className="text-xs text-gray-500">
+              Période: {localPoints.length > 0 ? 
+                `${new Date(localPoints[0].date).toLocaleDateString('fr-FR')} - ${new Date(localPoints[localPoints.length - 1].date).toLocaleDateString('fr-FR')}` 
+                : 'Aucune donnée'
+              }
+            </div>
+            <div className="flex gap-4 text-xs">
+              <span className="text-blue-600 font-semibold">
+                ↑ {stats.max.toLocaleString()} pic
+              </span>
+              <span className="text-green-600 font-semibold">
+                Ø {stats.average.toLocaleString()}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Legend */}
+        <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
+          <div className="flex items-center justify-between text-sm">
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 bg-blue-200 rounded"></div>
+              <span className="text-gray-600">Faible activité</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 bg-blue-400 rounded"></div>
+              <span className="text-gray-600">Activité moyenne</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 bg-blue-600 rounded"></div>
+              <span className="text-gray-600">Forte activité</span>
+            </div>
+          </div>
         </div>
       </div>
     )
