@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { Loader } from "lucide-react";
+import { Loader } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const AdminLogin = () => {
@@ -25,24 +25,30 @@ const AdminLogin = () => {
 
     try {
       const response = await axios.post('http://localhost:8000/api/utilisateurs/login/', formData, { withCredentials: true });
-      const { token, user } = response.data;
-      
-      // RBAC Check: Seul admin peut accéder
-      if (user.role !== 'admin') {
-        throw new Error('Accès refusé');  // Message exact comme demandé
+      console.log('Réponse API:', response.data);
+      const { token, user, message, email } = response.data;
+
+      // Gestion du 2FA
+      if (message === '2FA required') {
+        localStorage.setItem('email', email); // Stocke l'email pour la vérification 2FA
+        navigate('/two-factor', { state: { email } }); // Redirige vers la page 2FA
+        return;
       }
-      
-      // Succès: Stocke et redirige
+
+      // Vérification admin
+      if (!user || !user.role || user.role !== 'admin') {
+        throw new Error('Accès refusé : utilisateur non-administrateur ou données invalides');
+      }
+
+      // Succès : Stocke et redirige
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(user));
       toast.success('Connexion admin réussie !');
-      navigate('/users-list');  // Redirige vers dashboard admin (liste users)
+      navigate('/users-list');
     } catch (err) {
-      // Gestion erreur: Pour non-admin ou autres (ex. mauvais creds)
       const errMsg = err.response?.data?.error || err.message || 'Erreur de connexion';
       setError(errMsg);
       toast.error(errMsg);
-      // Ne stocke rien pour non-admin
     } finally {
       setLoading(false);
     }
@@ -111,19 +117,18 @@ const AdminLogin = () => {
               </div>
 
               {/* Submit */}
-            <button 
-              type="submit" 
-              className="btn bg-primary text-white w-full hover:bg-primary/90"
-              disabled={loading}
-            >
-              {loading ? (
-                <span className="flex items-center justify-center gap-2">
-                  <Loader className="animate-spin h-4 w-4" />
-                  Connexion...
-                </span>
-              ) : 'Se connecter'}
-            </button>
-
+              <button 
+                type="submit" 
+                className="btn bg-primary text-white w-full hover:bg-primary/90"
+                disabled={loading}
+              >
+                {loading ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <Loader className="animate-spin h-4 w-4" />
+                    Connexion...
+                  </span>
+                ) : 'Se connecter'}
+              </button>
             </div>
           </form>
 

@@ -23,20 +23,26 @@ const Login = () => {
     e.preventDefault();
     setLoading(true);
     setError('');
+
     try {
       const response = await axios.post(
         'http://localhost:8000/api/utilisateurs/login/',
         formData,
         { withCredentials: true }
       );
-      const { token, user } = response.data;
+      console.log('Réponse API:', response.data);
+      const { token, user, message, email } = response.data;
+
+      // Gestion du 2FA
+      if (message === '2FA required') {
+        localStorage.setItem('email', email); // Stocke l'email pour la vérification 2FA
+        navigate('/two-factor', { state: { email } }); // Redirige vers la page 2FA
+        return;
+      }
 
       // Vérifie que l'utilisateur est admin ou artiste
-      if (user.role !== 'admin' && user.role !== 'artiste') {
-        setError('Accès refusé. Seuls les administrateurs et artistes peuvent accéder au backoffice.');
-        toast.error('Accès refusé. Vous devez être admin ou artiste.');
-        setLoading(false);
-        return;
+      if (!user || !user.role || (user.role !== 'admin' && user.role !== 'artiste')) {
+        throw new Error('Accès refusé : seuls les administrateurs et artistes peuvent accéder au backoffice');
       }
 
       localStorage.setItem('token', token);
@@ -46,9 +52,9 @@ const Login = () => {
       }
       toast.success('Connexion réussie !');
       if (user.role === 'admin') {
-        navigate('/admin/users');  // Redirige vers liste users admin
+        navigate('/admin/users'); // Redirige vers liste users admin
       } else if (user.role === 'artiste') {
-        navigate('/');  // Redirige artiste vers dashboard
+        navigate('/'); // Redirige artiste vers dashboard
       }
     } catch (error) {
       const errMsg = error.response?.data?.error || 'Erreur de connexion. Vérifiez vos identifiants.';

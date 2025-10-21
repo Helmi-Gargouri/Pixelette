@@ -17,6 +17,11 @@ const Profile = () => {
   const [updating, setUpdating] = useState(false);
   const [showDemande, setShowDemande] = useState(false);
   const [raison, setRaison] = useState('');
+  // États pour le 2FA
+  const [showQRModal, setShowQRModal] = useState(false);
+  const [qrCode, setQrCode] = useState('');
+  const [enableCode, setEnableCode] = useState('');
+  const [isEnabling, setIsEnabling] = useState(false);
   const fileInputRef = useRef(null);
   const navigate = useNavigate();
 
@@ -163,6 +168,67 @@ const Profile = () => {
     }
   };
 
+  // Fonction pour activer le 2FA
+  const enable2FA = async () => {
+    if (!window.confirm('Êtes-vous sûr de vouloir activer le 2FA ? Vous devrez scanner un QR code à la prochaine connexion.')) {
+      return;
+    }
+
+    setIsEnabling(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.post(
+        'http://localhost:8000/api/utilisateurs/enable_2fa/',
+        { code: enableCode },
+        {
+          headers: { Authorization: `Token ${token}` },
+          withCredentials: true
+        }
+      );
+
+      if (response.data.qr_code) {
+        setQrCode(response.data.qr_code);
+        setShowQRModal(true);
+      } else if (response.data.message === '2FA enabled') {
+        setUser({ ...user, two_factor_enabled: true });
+        toast.success('2FA activé ! Reconnectez-vous pour scanner le QR code.');
+        setShowQRModal(false);
+        setEnableCode('');
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.error || 'Erreur lors de l\'activation du 2FA');
+    } finally {
+      setIsEnabling(false);
+    }
+  };
+
+  // Fonction pour désactiver le 2FA
+  const disable2FA = async () => {
+    if (!window.confirm('Êtes-vous sûr de vouloir désactiver le 2FA ? Cela rendra votre compte moins sécurisé.')) {
+      return;
+    }
+
+    setUpdating(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.post(
+        'http://localhost:8000/api/utilisateurs/disable_2fa/',
+        {},
+        {
+          headers: { Authorization: `Token ${token}` },
+          withCredentials: true
+        }
+      );
+
+      setUser({ ...user, two_factor_enabled: false });
+      toast.success('2FA désactivé ! Votre prochaine connexion ne nécessitera pas de code.');
+    } catch (error) {
+      toast.error(error.response?.data?.error || 'Erreur lors de la désactivation du 2FA');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="relative min-h-screen w-full flex justify-center items-center">
@@ -255,7 +321,7 @@ const Profile = () => {
                 <p className="text-sm text-default-500">{user.telephone || 'Non renseigné'}</p>
               </div>
 
-              {/* Formulaire Profil */}
+              {/* Formulaire Profil & Sécurité */}
               <div className="col-span-2 space-y-4">
                 {!editing && (
                   <button
@@ -315,6 +381,49 @@ const Profile = () => {
                   )}
                 </form>
 
+                {/* Section Sécurité */}
+                <div className="p-4 bg-primary/10 rounded-lg">
+                  <h6 className="font-semibold mb-2 flex items-center gap-2">
+                    <svg
+                      className="w-5 h-5 text-primary"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 11c0-2.76-2.24-5-5-5S2 8.24 2 11v5h10v-5zm0 0c0-2.76 2.24-5 5-5s5 2.24 5 5v5H12v-5z"
+                      />
+                    </svg>
+                    Sécurité
+                  </h6>
+                  <p className="text-sm text-default-600 mb-3">
+                    Gérez les paramètres de sécurité de votre compte
+                  </p>
+                  <div className="flex justify-between items-center">
+                  
+                    {user.two_factor_enabled ? (
+                      <button
+                        onClick={disable2FA}
+                        disabled={updating}
+                        className="btn btn-sm bg-danger text-white"
+                      >
+                        Désactiver
+                      </button>
+                    ) : (
+                      <button
+                        onClick={enable2FA}
+                        disabled={isEnabling}
+                        className="btn btn-sm bg-primary text-white"
+                      >
+                        {isEnabling ? <Loader2 className="animate-spin w-4 h-4 mr-2" /> : 'Activer'}
+                      </button>
+                    )}
+                  </div>
+                </div>
+
                 {/* Demande Artiste - Seulement pour les users */}
                 {user.role === 'user' && (
                   <div className="p-4 bg-warning/10 rounded-lg">
@@ -364,6 +473,47 @@ const Profile = () => {
                     </button>
                     <button onClick={handleRequestArtiste} disabled={updating} className="btn bg-primary text-white flex-1">
                       {updating ? <Loader2 className="animate-spin w-4 h-4 mr-2" /> : 'Envoyer'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Modal QR Code 2FA */}
+            {showQRModal && (
+              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                <div className="bg-white rounded-lg p-6 max-w-md w-full">
+                  <h6 className="font-semibold mb-3">Activer l'authentification à deux facteurs</h6>
+                  <p className="text-sm text-default-600 mb-3">
+                    Scannez ce QR code avec votre application d'authentification (par exemple, Google Authenticator).
+                  </p>
+                  <div className="text-center mb-4">
+                    <img src={`data:image/png;base64,${qrCode}`} alt="QR Code" className="w-48 h-48 mx-auto" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Code de vérification</label>
+                    <input
+                      type="text"
+                      value={enableCode}
+                      onChange={(e) => setEnableCode(e.target.value)}
+                      className="form-input w-full text-center"
+                      placeholder="000000"
+                      maxLength="6"
+                    />
+                  </div>
+                  <div className="flex gap-2 mt-4">
+                    <button
+                      onClick={() => setShowQRModal(false)}
+                      className="btn bg-default-200 text-default-600 flex-1"
+                    >
+                      Annuler
+                    </button>
+                    <button
+                      onClick={enable2FA}
+                      disabled={isEnabling || enableCode.length !== 6}
+                      className="btn bg-primary text-white flex-1"
+                    >
+                      {isEnabling ? <Loader2 className="animate-spin w-4 h-4 mr-2" /> : 'Activer'}
                     </button>
                   </div>
                 </div>

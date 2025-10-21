@@ -54,6 +54,8 @@ const BasicResetPassword = lazy(() => import('@/app/(auth)/basic-reset-password'
 const BasicVerifyEmail = lazy(() => import('@/app/(auth)/basic-verify-email'));
 const BasicLogout = lazy(() => import('@/app/(auth)/basic-logout'));
 const BasicTwoStep = lazy(() => import('@/app/(auth)/basic-two-steps'));
+const TwoFactorAuth = lazy(() => import('@/app/(auth)/two-factor'));
+
 
 const Calender = lazy(() => import('@/app/(admin)/(app)/calendar'));
 const Chat = lazy(() => import('@/app/(admin)/(app)/chat'));
@@ -376,6 +378,10 @@ export const singlePageRoutes = [{
   path: '/basic-two-steps',
   name: 'BasicTwoStep',
   element: <BasicTwoStep />
+},  {
+  path: '/two-factor',
+  name: 'TwoFactorAuth',
+  element: <TwoFactorAuth />
 }, {
   path: '/boxed-login',
   name: 'BoxedLogin',

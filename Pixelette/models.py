@@ -18,6 +18,8 @@ class Utilisateur(models.Model):
     two_factor_temp_secret = models.CharField(max_length=100, blank=True, null=True)
     reset_code = models.CharField(max_length=5, blank=True, null=True)
     reset_code_expires = models.DateTimeField(blank=True, null=True)
+    score_artiste = models.IntegerField(default=0, verbose_name="Score Artiste (0-100)")
+    score_artiste_updated = models.DateTimeField(null=True, blank=True, verbose_name="Dernière mise à jour du score")
 
     ROLE_CHOICES = [
         ('user', 'User'),
@@ -98,12 +100,52 @@ class Interaction(models.Model):
     TYPE_CHOICES = [
         ("like", "Like"),
         ("commentaire", "Commentaire"),
+        ("partage", "Partage"),
     ]
     type = models.CharField(max_length=20, choices=TYPE_CHOICES, verbose_name="Type d'interaction")
-    utilisateur = models.ForeignKey(Utilisateur, on_delete=models.CASCADE, verbose_name="Utilisateur")
-    oeuvre = models.ForeignKey(Oeuvre, on_delete=models.CASCADE, verbose_name="Œuvre")
+    utilisateur = models.ForeignKey(Utilisateur, on_delete=models.CASCADE, related_name="interactions", verbose_name="Utilisateur")
+    oeuvre = models.ForeignKey(Oeuvre, on_delete=models.CASCADE, related_name="interactions", verbose_name="Œuvre")
     contenu = models.TextField(blank=True, verbose_name="Contenu du commentaire")
+    
+    # Champ pour les réponses aux commentaires
+    parent = models.ForeignKey(
+        'self', 
+        on_delete=models.CASCADE, 
+        null=True, 
+        blank=True, 
+        related_name='reponses',
+        verbose_name="Commentaire parent"
+    )
+    
+    # Champs spécifiques au partage
+    plateforme_partage = models.CharField(
+        max_length=50, 
+        blank=True, 
+        choices=[
+            ('facebook', 'Facebook'),
+            ('twitter', 'Twitter'),
+            ('instagram', 'Instagram'),
+            ('email', 'Email'),
+            ('link', 'Lien direct'),
+        ],
+        verbose_name="Plateforme de partage"
+    )
+    
     date = models.DateTimeField(auto_now_add=True, verbose_name="Date")
+    
+    class Meta:
+        # Seuls les likes doivent être uniques par utilisateur/œuvre
+        # Les commentaires et partages peuvent être multiples
+        constraints = [
+            models.UniqueConstraint(
+                fields=['utilisateur', 'oeuvre'],
+                condition=models.Q(type='like'),
+                name='unique_like_per_user_oeuvre'
+            )
+        ]
+        verbose_name = "Interaction"
+        verbose_name_plural = "Interactions"
+        ordering = ['-date']
 
     def __str__(self):
         return f"{self.type} par {self.utilisateur} sur {self.oeuvre}"
@@ -204,6 +246,92 @@ class DemandeRole(models.Model):
 
     def __str__(self):
         return f"{self.utilisateur.prenom} {self.utilisateur.nom} → {self.nouveau_role} ({self.statut})"
+    
+
+class Connexion(models.Model):
+    """Tracker les connexions des utilisateurs"""
+    utilisateur = models.ForeignKey(Utilisateur, on_delete=models.CASCADE, related_name='connexions')
+    date_connexion = models.DateTimeField(auto_now_add=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    
+    class Meta:
+        verbose_name = "Connexion"
+        verbose_name_plural = "Connexions"
+        ordering = ['-date_connexion']
+        indexes = [
+            models.Index(fields=['utilisateur', '-date_connexion']),
+        ]
+    
+    def __str__(self):
+        return f"{self.utilisateur.email} - {self.date_connexion.strftime('%d/%m/%Y %H:%M')}"
+
+
+class ConsultationOeuvre(models.Model):
+    """Tracker les consultations d'œuvres"""
+    utilisateur = models.ForeignKey(Utilisateur, on_delete=models.CASCADE, related_name='consultations', null=True, blank=True)
+    oeuvre_id = models.IntegerField()  # ID de l'œuvre (pas de ForeignKey car modèle externe)
+    date_consultation = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        verbose_name = "Consultation d'œuvre"
+        verbose_name_plural = "Consultations d'œuvres"
+        ordering = ['-date_consultation']
+        indexes = [
+            models.Index(fields=['utilisateur', '-date_consultation']),
+            models.Index(fields=['oeuvre_id']),
+        ]
+    
+    def __str__(self):
+        user_info = self.utilisateur.email if self.utilisateur else "Anonyme"
+        return f"{user_info} - Œuvre {self.oeuvre_id} - {self.date_consultation.strftime('%d/%m/%Y')}"
+
+
+class PartageOeuvre(models.Model):
+    """Tracker les partages d'œuvres sur les réseaux sociaux"""
+    PLATEFORME_CHOICES = [
+        ('facebook', 'Facebook'),
+        ('twitter', 'Twitter'),
+        ('linkedin', 'LinkedIn'),
+        ('whatsapp', 'WhatsApp'),
+    ]
+    
+    utilisateur = models.ForeignKey(Utilisateur, on_delete=models.CASCADE, related_name='partages')
+    oeuvre_id = models.IntegerField()
+    plateforme = models.CharField(max_length=20, choices=PLATEFORME_CHOICES)
+    date_partage = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        verbose_name = "Partage d'œuvre"
+        verbose_name_plural = "Partages d'œuvres"
+        ordering = ['-date_partage']
+        indexes = [
+            models.Index(fields=['utilisateur', '-date_partage']),
+        ]
+    
+    def __str__(self):
+        return f"{self.utilisateur.email} - Œuvre {self.oeuvre_id} sur {self.plateforme}"
+
+
+class ContactArtiste(models.Model):
+    """Tracker les contacts/messages envoyés aux artistes"""
+    utilisateur = models.ForeignKey(Utilisateur, on_delete=models.CASCADE, related_name='contacts_envoyes')
+    artiste = models.ForeignKey(Utilisateur, on_delete=models.CASCADE, related_name='contacts_recus')
+    sujet = models.CharField(max_length=200, default="Demande de contact")
+    message = models.TextField()
+    date_contact = models.DateTimeField(auto_now_add=True)
+    lu = models.BooleanField(default=False, verbose_name="Message lu par l'artiste")
+    
+    class Meta:
+        verbose_name = "Contact artiste"
+        verbose_name_plural = "Contacts artistes"
+        ordering = ['-date_contact']
+        indexes = [
+            models.Index(fields=['utilisateur', '-date_contact']),
+            models.Index(fields=['artiste', 'lu']),
+        ]
+    
+    def __str__(self):
+        return f"{self.utilisateur.email} → {self.artiste.email} ({self.date_contact.strftime('%d/%m/%Y')})"
 
 from django.db.models.signals import post_save
 from django.dispatch import receiver
