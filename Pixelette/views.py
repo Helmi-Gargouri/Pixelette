@@ -860,7 +860,20 @@ L'équipe Pixelette
 class InteractionViewSet(viewsets.ModelViewSet):
     queryset = Interaction.objects.all()
     serializer_class = InteractionSerializer
-    permission_classes = [AllowAny]  # Temporaire pour les tests
+    permission_classes = [IsAuthenticated]  # Changé pour exiger l'authentification
+    
+    def get_permissions(self):
+        """Permissions selon l'action"""
+        if self.action in ['list', 'retrieve', 'stats_by_oeuvre', 'statistics']:
+            # Lecture libre pour les statistiques
+            permission_classes = [AllowAny]
+        elif self.action in ['create', 'toggle_like']:
+            # Pour l'instant, permettre la création sans authentification pour débugger
+            permission_classes = [AllowAny]
+        else:
+            # Authentification requise pour modifier/supprimer
+            permission_classes = [IsAuthenticated]
+        return [permission() for permission in permission_classes]
     
     def get_serializer_class(self):
         if self.action in ['create', 'update', 'partial_update']:
@@ -941,6 +954,31 @@ class InteractionViewSet(viewsets.ModelViewSet):
         return Response({
             'message': 'Interaction supprimée avec succès'
         }, status=status.HTTP_200_OK)
+    
+    def perform_create(self, serializer):
+        """Automatiquement assigner l'utilisateur connecté lors de la création"""
+        print(f"🔍 perform_create appelé avec request.user: {self.request.user}")
+        print(f"🔍 request.user.is_authenticated: {getattr(self.request.user, 'is_authenticated', 'N/A')}")
+        print(f"🔍 Données du serializer: {serializer.validated_data}")
+        
+        try:
+            # Si l'utilisateur n'est pas authentifié, essayer de trouver l'utilisateur autrement
+            if hasattr(self.request.user, 'is_authenticated') and self.request.user.is_authenticated:
+                user = self.request.user
+                print(f"✅ Utilisateur authentifié trouvé: {user}")
+            else:
+                # Pour débugger : utiliser un utilisateur par défaut (temporaire)
+                from .models import Utilisateur
+                user = Utilisateur.objects.first()  # TEMPORAIRE
+                print(f"⚠️ Utilisateur par défaut utilisé: {user}")
+            
+            serializer.save(utilisateur=user)
+            print("✅ Interaction créée avec succès")
+        except Exception as e:
+            print(f"❌ Erreur lors de la création: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            raise
     
     def perform_create(self, serializer):
         # Automatiquement assigner l'utilisateur connecté

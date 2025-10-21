@@ -78,3 +78,36 @@ html {
   display: flex !important;
   align-items: center !important;
 }
+
+/* Interactions styles */
+.interaction-stats {
+  padding: 15px;
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  border-radius: 10px;
+  margin-bottom: 20px;
+}
+
+.comment-item {
+  transition: all 0.3s ease;
+}
+
+.comment-item:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  transform: translateY(-2px);
+}
+
+.like-btn {
+  transition: all 0.3s ease;
+}
+
+.like-btn:hover {
+  transform: scale(1.05);
+}
+
+.avatar {
+  transition: all 0.3s ease;
+}
+
+.avatar:hover {
+  transform: scale(1.1);
+}

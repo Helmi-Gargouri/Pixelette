@@ -122,7 +122,15 @@ class Interaction(models.Model):
     date = models.DateTimeField(auto_now_add=True, verbose_name="Date")
     
     class Meta:
-        unique_together = ['utilisateur', 'oeuvre', 'type']
+        # Seuls les likes doivent être uniques par utilisateur/œuvre
+        # Les commentaires et partages peuvent être multiples
+        constraints = [
+            models.UniqueConstraint(
+                fields=['utilisateur', 'oeuvre'],
+                condition=models.Q(type='like'),
+                name='unique_like_per_user_oeuvre'
+            )
+        ]
         verbose_name = "Interaction"
         verbose_name_plural = "Interactions"
         ordering = ['-date']

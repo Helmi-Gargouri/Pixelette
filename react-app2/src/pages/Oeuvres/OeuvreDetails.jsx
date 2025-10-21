@@ -6,6 +6,8 @@ import Modal from '../../components/Modal'
 import ConfirmModal from '../../components/ConfirmModal'
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch'
 
+
+
 const OeuvreDetails = () => {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -18,11 +20,35 @@ const OeuvreDetails = () => {
   const [confirmModal, setConfirmModal] = useState(false)
   const [rotation, setRotation] = useState(0)
   const [showCopySuccess, setShowCopySuccess] = useState(false)
+  
+  // États pour les interactions
+  const [interactionStats, setInteractionStats] = useState({
+    total_likes: 0,
+    total_commentaires: 0,
+    total_partages: 0,
+    liked: false
+  })
+  const [comments, setComments] = useState([])
+  const [newComment, setNewComment] = useState('')
+  const [loadingInteractions, setLoadingInteractions] = useState({
+    like: false,
+    comment: false,
+    stats: false
+  })
 
   useEffect(() => {
     fetchOeuvre()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
+
+  // Charger les interactions après avoir chargé l'œuvre
+  useEffect(() => {
+    if (oeuvre) {
+      fetchInteractionStats()
+      checkUserLike()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [oeuvre, isAuthenticated, user])
 
   const fetchOeuvre = async () => {
     try {
@@ -47,6 +73,177 @@ const OeuvreDetails = () => {
       setLoading(false)
     }
   }
+
+  // Fonction pour charger les statistiques d'interactions
+  const fetchInteractionStats = async () => {
+    try {
+      setLoadingInteractions(prev => ({ ...prev, stats: true }))
+      
+      const response = await axios.get(
+        `http://localhost:8000/api/interactions/stats_by_oeuvre/?oeuvre=${id}`,
+        { withCredentials: true }
+      )
+      
+      setInteractionStats({
+        total_likes: response.data.total_likes || 0,
+        total_commentaires: response.data.total_commentaires || 0,
+        total_partages: response.data.total_partages || 0,
+        liked: false // À déterminer en fonction de l'utilisateur connecté
+      })
+
+      // Charger les commentaires
+      if (response.data.interactions_recentes) {
+        const commentaires = response.data.interactions_recentes.filter(
+          interaction => interaction.type === 'commentaire'
+        )
+        setComments(commentaires)
+      }
+
+      setLoadingInteractions(prev => ({ ...prev, stats: false }))
+    } catch (err) {
+      console.error('Erreur lors du chargement des statistiques:', err)
+      setLoadingInteractions(prev => ({ ...prev, stats: false }))
+    }
+  }
+
+  // Fonction pour vérifier si l'utilisateur a déjà liké l'œuvre
+  const checkUserLike = async () => {
+    if (!isAuthenticated || !user) return
+
+    try {
+      const response = await axios.get(
+        `http://localhost:8000/api/interactions/?oeuvre=${id}&type=like`,
+        { withCredentials: true }
+      )
+      
+      const userLike = response.data.find(
+        interaction => interaction.utilisateur === user.id
+      )
+      
+      setInteractionStats(prev => ({ 
+        ...prev, 
+        liked: !!userLike 
+      }))
+    } catch (err) {
+      console.error('Erreur lors de la vérification du like:', err)
+    }
+  }
+
+  // Fonction pour toggle like
+  const handleToggleLike = async () => {
+    if (!isAuthenticated) {
+      setModal({
+        show: true,
+        title: 'Connexion requise',
+        message: 'Vous devez être connecté pour liker une œuvre',
+        type: 'error'
+      })
+      return
+    }
+
+    try {
+      setLoadingInteractions(prev => ({ ...prev, like: true }))
+      
+      const response = await axios.post(
+        'http://localhost:8000/api/interactions/toggle_like/',
+        { oeuvre: parseInt(id) }, // Convertir en entier
+        { withCredentials: true }
+      )
+
+      setInteractionStats(prev => ({
+        ...prev,
+        liked: response.data.liked,
+        total_likes: response.data.total_likes
+      }))
+
+      setLoadingInteractions(prev => ({ ...prev, like: false }))
+    } catch (err) {
+      console.error('Erreur lors du toggle like:', err)
+      setModal({
+        show: true,
+        title: 'Erreur',
+        message: 'Erreur lors de l\'action like',
+        type: 'error'
+      })
+      setLoadingInteractions(prev => ({ ...prev, like: false }))
+    }
+  }
+
+  // Fonction pour ajouter un commentaire
+  const handleAddComment = async (e) => {
+    e.preventDefault()
+    
+    if (!isAuthenticated) {
+      setModal({
+        show: true,
+        title: 'Connexion requise',
+        message: 'Vous devez être connecté pour commenter',
+        type: 'error'
+      })
+      return
+    }
+
+    if (!newComment.trim()) {
+      setModal({
+        show: true,
+        title: 'Erreur',
+        message: 'Le commentaire ne peut pas être vide',
+        type: 'error'
+      })
+      return
+    }
+
+
+
+    try {
+      setLoadingInteractions(prev => ({ ...prev, comment: true }))
+      
+      await axios.post(
+        'http://localhost:8000/api/interactions/',
+        {
+          type: 'commentaire',
+          oeuvre: parseInt(id), // Convertir en entier
+          contenu: newComment.trim()
+        },
+        { withCredentials: true }
+      )
+
+
+
+      // Recharger les statistiques et commentaires
+      await fetchInteractionStats()
+      setNewComment('')
+      setLoadingInteractions(prev => ({ ...prev, comment: false }))
+    } catch (err) {
+      console.error('Erreur lors de l\'ajout du commentaire:', err)
+      
+      let errorMessage = 'Erreur lors de l\'ajout du commentaire'
+      
+      if (err.response?.status === 500) {
+        errorMessage = 'Erreur serveur. Vérifiez que vous êtes bien connecté.'
+      } else if (err.response?.status === 401) {
+        errorMessage = 'Vous devez être connecté pour commenter.'
+      } else if (err.response?.status === 403) {
+        errorMessage = 'Vous n\'avez pas l\'autorisation de commenter.'
+      } else if (err.response?.data?.detail) {
+        errorMessage = err.response.data.detail
+      } else if (err.response?.data?.error) {
+        errorMessage = err.response.data.error
+      } else if (err.message) {
+        errorMessage = err.message
+      }
+      
+      setModal({
+        show: true,
+        title: 'Erreur',
+        message: errorMessage,
+        type: 'error'
+      })
+      setLoadingInteractions(prev => ({ ...prev, comment: false }))
+    }
+  }
+
+
 
   const handleDeleteClick = () => {
     setConfirmModal(true)
@@ -90,7 +287,7 @@ const OeuvreDetails = () => {
   const shareTitle = oeuvre?.titre || 'Découvrez cette œuvre'
   const shareDescription = oeuvre?.description || 'Une magnifique œuvre sur Pixelette'
   
-  const handleShare = (platform) => {
+  const handleShare = async (platform) => {
     let url = ''
     const encodedUrl = encodeURIComponent(currentUrl)
     const encodedTitle = encodeURIComponent(shareTitle)
@@ -114,13 +311,39 @@ const OeuvreDetails = () => {
         url = `https://wa.me/?text=${encodedTitle}%20-%20${encodedUrl}`
         break
       case 'pinterest':
-        const imageUrl = oeuvre?.image ? 
-          (oeuvre.image.startsWith('http') ? oeuvre.image : `${window.location.origin}${oeuvre.image}`) : 
-          ''
-        url = `https://pinterest.com/pin/create/button/?url=${encodedUrl}&media=${encodeURIComponent(imageUrl)}&description=${encodedTitle}%20-%20${encodedDescription}`
+        {
+          const imageUrl = oeuvre?.image ? 
+            (oeuvre.image.startsWith('http') ? oeuvre.image : `${window.location.origin}${oeuvre.image}`) : 
+            ''
+          url = `https://pinterest.com/pin/create/button/?url=${encodedUrl}&media=${encodeURIComponent(imageUrl)}&description=${encodedTitle}%20-%20${encodedDescription}`
+        }
         break
       default:
         return
+    }
+    
+    // Enregistrer le partage dans la base de données si l'utilisateur est connecté
+    if (isAuthenticated) {
+      try {
+        await axios.post(
+          'http://localhost:8000/api/interactions/',
+          {
+            type: 'partage',
+            oeuvre: parseInt(id), // Convertir en entier
+            plateforme_partage: platform
+          },
+          { withCredentials: true }
+        )
+        
+        // Mettre à jour les statistiques
+        setInteractionStats(prev => ({
+          ...prev,
+          total_partages: prev.total_partages + 1
+        }))
+      } catch (err) {
+        console.error('Erreur lors de l\'enregistrement du partage:', err)
+        // Ne pas empêcher le partage même si l'enregistrement échoue
+      }
     }
     
     // Ouvrir dans une popup avec des dimensions optimales
@@ -187,6 +410,8 @@ const OeuvreDetails = () => {
 
   return (
     <>
+
+      
       <Modal
         show={modal.show}
         onClose={handleModalClose}
@@ -413,6 +638,161 @@ const OeuvreDetails = () => {
                    </div>
                   </>
                  )}
+              </div>
+            </div>
+
+            {/* Section Interactions */}
+            <div className="col-xl-8">
+              <div className="portfolio-details-wrap mt-40">
+                {/* Statistiques des interactions */}
+                <div className="interaction-stats mb-4">
+                  <div className="d-flex align-items-center gap-4 mb-3">
+                    <div className="d-flex align-items-center">
+                      <i className="fas fa-heart text-danger me-2"></i>
+                      <span className="fw-semibold">{interactionStats.total_likes} likes</span>
+                    </div>
+                    <div className="d-flex align-items-center">
+                      <i className="fas fa-comment text-primary me-2"></i>
+                      <span className="fw-semibold">{interactionStats.total_commentaires} commentaires</span>
+                    </div>
+                    <div className="d-flex align-items-center">
+                      <i className="fas fa-share text-success me-2"></i>
+                      <span className="fw-semibold">{interactionStats.total_partages} partages</span>
+                    </div>
+                  </div>
+
+                  {/* Bouton Like */}
+                  {isAuthenticated && (
+                    <button 
+                      onClick={handleToggleLike}
+                      disabled={loadingInteractions.like}
+                      className={`btn btn-sm me-3 like-btn ${
+                        interactionStats.liked 
+                          ? 'btn-danger' 
+                          : 'btn-outline-danger'
+                      }`}
+                      style={{ minWidth: '120px' }}
+                    >
+                      {loadingInteractions.like ? (
+                        <i className="fas fa-spinner fa-spin me-2"></i>
+                      ) : (
+                        <i className={`fas fa-heart me-2 ${interactionStats.liked ? '' : 'far'}`}></i>
+                      )}
+                      {interactionStats.liked ? 'Aimé' : 'Aimer'}
+                    </button>
+                  )}
+                </div>
+
+                {/* Section Commentaires */}
+                <div className="mt-5">
+                  <h3 className="fw-semibold mb-3">
+                    Commentaires ({interactionStats.total_commentaires})
+                  </h3>
+
+                  {/* Formulaire d'ajout de commentaire */}
+                  {isAuthenticated ? (
+                    <form onSubmit={handleAddComment} className="mb-4">
+                      <div className="row">
+                        <div className="col-md-10">
+                          <textarea
+                            value={newComment}
+                            onChange={(e) => setNewComment(e.target.value)}
+                            className="form-control"
+                            rows="3"
+                            placeholder="Ajoutez votre commentaire..."
+                            disabled={loadingInteractions.comment}
+                          />
+                        </div>
+                        <div className="col-md-2 d-flex align-items-end">
+                          <button 
+                            type="submit"
+                            disabled={loadingInteractions.comment || !newComment.trim()}
+                            className="btn btn-primary w-100"
+                          >
+                            {loadingInteractions.comment ? (
+                              <i className="fas fa-spinner fa-spin"></i>
+                            ) : (
+                              'Publier'
+                            )}
+                          </button>
+                        </div>
+                      </div>
+
+                    </form>
+                  ) : (
+                    <div className="alert alert-info mb-4">
+                      <i className="fas fa-info-circle me-2"></i>
+                      Vous devez être connecté pour commenter cette œuvre.
+                    </div>
+                  )}
+
+                  {/* Liste des commentaires */}
+                  <div className="comments-list">
+                    {loadingInteractions.stats ? (
+                      <div className="text-center py-4">
+                        <i className="fas fa-spinner fa-spin fa-2x"></i>
+                        <p className="mt-2">Chargement des commentaires...</p>
+                      </div>
+                    ) : comments.length > 0 ? (
+                      comments.map((comment) => (
+                        <div 
+                          key={comment.id} 
+                          className="comment-item mb-4 p-3"
+                          style={{ 
+                            backgroundColor: '#f8f9fa', 
+                            borderRadius: '10px',
+                            border: '1px solid #e9ecef'
+                          }}
+                        >
+                          <div className="d-flex justify-content-between align-items-start mb-2">
+                            <div className="d-flex align-items-center">
+                              <div 
+                                className="avatar me-3"
+                                style={{
+                                  width: '40px',
+                                  height: '40px',
+                                  backgroundColor: '#007bff',
+                                  borderRadius: '50%',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  color: '#fff',
+                                  fontWeight: 'bold'
+                                }}
+                              >
+                                {comment.utilisateur_nom?.charAt(0) || 'U'}
+                              </div>
+                              <div>
+                                <h6 className="mb-0 fw-semibold">
+                                  {comment.utilisateur_nom || 'Utilisateur'}
+                                </h6>
+                                <small className="text-muted">
+                                  {new Date(comment.date).toLocaleDateString('fr-FR', {
+                                    day: 'numeric',
+                                    month: 'long',
+                                    year: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit'
+                                  })}
+                                </small>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="comment-content">
+                            <p className="mb-0" style={{ lineHeight: '1.6' }}>
+                              {comment.contenu}
+                            </p>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-center py-4 text-muted">
+                        <i className="fas fa-comments fa-3x mb-3"></i>
+                        <p>Aucun commentaire pour le moment. Soyez le premier à commenter !</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
 
