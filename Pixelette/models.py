@@ -105,6 +105,16 @@ class Interaction(models.Model):
     oeuvre = models.ForeignKey(Oeuvre, on_delete=models.CASCADE, related_name="interactions", verbose_name="Œuvre")
     contenu = models.TextField(blank=True, verbose_name="Contenu du commentaire")
     
+    # Champ pour les réponses aux commentaires
+    parent = models.ForeignKey(
+        'self', 
+        on_delete=models.CASCADE, 
+        null=True, 
+        blank=True, 
+        related_name='reponses',
+        verbose_name="Commentaire parent"
+    )
+    
     # Champs spécifiques au partage
     plateforme_partage = models.CharField(
         max_length=50, 

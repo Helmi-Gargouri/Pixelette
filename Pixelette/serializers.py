@@ -98,20 +98,37 @@ class GalerieInvitationSerializer(serializers.ModelSerializer):
 class InteractionSerializer(serializers.ModelSerializer):
     utilisateur_nom = serializers.SerializerMethodField()
     oeuvre_titre = serializers.SerializerMethodField()
+    replies = serializers.SerializerMethodField()
+    parent_id = serializers.IntegerField(source='parent.id', read_only=True)
     
     class Meta:
         model = Interaction
         fields = [
             'id', 'type', 'utilisateur', 'utilisateur_nom', 
-            'oeuvre', 'oeuvre_titre', 'contenu', 'plateforme_partage', 'date'
+            'oeuvre', 'oeuvre_titre', 'contenu', 'plateforme_partage', 
+            'date', 'parent', 'parent_id', 'replies'
         ]
-        read_only_fields = ['id', 'date', 'utilisateur_nom', 'oeuvre_titre']
+        read_only_fields = ['id', 'date', 'utilisateur_nom', 'oeuvre_titre', 'parent_id', 'replies']
     
     def get_utilisateur_nom(self, obj):
         return f"{obj.utilisateur.prenom} {obj.utilisateur.nom}"
     
     def get_oeuvre_titre(self, obj):
         return obj.oeuvre.titre
+    
+    def get_replies(self, obj):
+        """Récupérer les réponses pour un commentaire (seulement si c'est un commentaire principal)"""
+        if obj.type == 'commentaire' and obj.parent is None:
+            replies = obj.reponses.all().order_by('date')
+            # Éviter la récursion infinie en utilisant un serializer simplifié
+            return [{
+                'id': reply.id,
+                'utilisateur_nom': f"{reply.utilisateur.prenom} {reply.utilisateur.nom}",
+                'contenu': reply.contenu,
+                'date': reply.date,
+                'parent_id': reply.parent.id if reply.parent else None
+            } for reply in replies]
+        return []
     
     def validate(self, data):
         # Validation pour les commentaires
@@ -137,7 +154,7 @@ class InteractionCreateSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Interaction
-        fields = ['type', 'oeuvre', 'contenu', 'plateforme_partage']
+        fields = ['type', 'oeuvre', 'contenu', 'plateforme_partage', 'parent']
     
     def validate(self, data):
         # Validation selon le type

@@ -1075,6 +1075,146 @@ class InteractionViewSet(viewsets.ModelViewSet):
         except Interaction.DoesNotExist:
             return Response({'error': 'Interaction non trouvée'}, status=status.HTTP_404_NOT_FOUND)
 
+    @action(detail=False, methods=['post'], permission_classes=[AllowAny])  # À changer en IsAuthenticated plus tard
+    def reply_to_comment(self, request):
+        """Créer une réponse à un commentaire"""
+        parent_id = request.data.get('parent')
+        oeuvre_id = request.data.get('oeuvre')
+        contenu = request.data.get('contenu')
+        
+        if not all([parent_id, oeuvre_id, contenu]):
+            return Response({
+                'error': 'parent, oeuvre et contenu sont requis'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            parent_comment = Interaction.objects.get(
+                id=parent_id, 
+                type='commentaire'
+            )
+            oeuvre = Oeuvre.objects.get(id=oeuvre_id)
+            
+            # Créer la réponse
+            reply = Interaction.objects.create(
+                type='commentaire',
+                utilisateur=request.user if hasattr(request.user, 'is_authenticated') and request.user.is_authenticated else Utilisateur.objects.first(),  # Temporaire pour débuggage
+                oeuvre=oeuvre,
+                contenu=contenu.strip(),
+                parent=parent_comment
+            )
+            
+            return Response({
+                'message': 'Réponse ajoutée avec succès',
+                'reply': InteractionSerializer(reply).data
+            }, status=status.HTTP_201_CREATED)
+            
+        except Interaction.DoesNotExist:
+            return Response({
+                'error': 'Commentaire parent non trouvé'
+            }, status=status.HTTP_404_NOT_FOUND)
+        except Oeuvre.DoesNotExist:
+            return Response({
+                'error': 'Œuvre non trouvée'
+            }, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({
+                'error': f'Erreur lors de la création de la réponse: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(detail=False, methods=['get'])
+    def comments_with_replies(self, request):
+        """Récupérer les commentaires avec leurs réponses de manière hiérarchique"""
+        oeuvre_id = request.query_params.get('oeuvre')
+        
+        if not oeuvre_id:
+            return Response({
+                'error': 'oeuvre_id requis'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            oeuvre = Oeuvre.objects.get(id=oeuvre_id)
+            
+            # Récupérer tous les commentaires principaux (sans parent)
+            main_comments = Interaction.objects.filter(
+                oeuvre=oeuvre,
+                type='commentaire',
+                parent__isnull=True
+            ).select_related('utilisateur').prefetch_related(
+                'reponses__utilisateur'
+            ).order_by('-date')
+            
+            # Sérialiser avec les réponses
+            comments_data = []
+            for comment in main_comments:
+                comment_data = InteractionSerializer(comment).data
+                
+                # Ajouter les réponses
+                replies = comment.reponses.all().order_by('date')
+                comment_data['replies'] = InteractionSerializer(replies, many=True).data
+                comment_data['replies_count'] = replies.count()
+                
+                comments_data.append(comment_data)
+            
+            return Response({
+                'comments': comments_data,
+                'total_comments': main_comments.count()
+            })
+            
+        except Oeuvre.DoesNotExist:
+            return Response({
+                'error': 'Œuvre non trouvée'
+            }, status=status.HTTP_404_NOT_FOUND)
+
+    @action(detail=False, methods=['get'])
+    def interaction_details(self, request):
+        """Récupérer les détails des interactions pour les tooltips (incluant les réponses)"""
+        oeuvre_id = request.query_params.get('oeuvre')
+        
+        if not oeuvre_id:
+            return Response({'error': 'oeuvre_id requis'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            oeuvre = Oeuvre.objects.get(id=oeuvre_id)
+            
+            # Likes
+            likes = Interaction.objects.filter(
+                oeuvre=oeuvre, type='like'
+            ).select_related('utilisateur').order_by('-date')[:10]
+            
+            # Commentaires (seulement les commentaires principaux pour les tooltips)
+            commentaires = Interaction.objects.filter(
+                oeuvre=oeuvre, type='commentaire', parent__isnull=True
+            ).select_related('utilisateur').order_by('-date')[:5]
+            
+            # Partages
+            partages = Interaction.objects.filter(
+                oeuvre=oeuvre, type='partage'
+            ).select_related('utilisateur').order_by('-date')[:10]
+            
+            return Response({
+                'likes': [{
+                    'id': like.id,
+                    'utilisateur_nom': f"{like.utilisateur.prenom} {like.utilisateur.nom}",
+                    'date': like.date
+                } for like in likes],
+                'commentaires': [{
+                    'id': comment.id,
+                    'utilisateur_nom': f"{comment.utilisateur.prenom} {comment.utilisateur.nom}",
+                    'contenu': comment.contenu,
+                    'date': comment.date,
+                    'replies_count': comment.reponses.count()
+                } for comment in commentaires],
+                'partages': [{
+                    'id': partage.id,
+                    'utilisateur_nom': f"{partage.utilisateur.prenom} {partage.utilisateur.nom}",
+                    'plateforme_partage': partage.plateforme_partage,
+                    'date': partage.date
+                } for partage in partages]
+            })
+            
+        except Oeuvre.DoesNotExist:
+            return Response({'error': 'Œuvre non trouvée'}, status=status.HTTP_404_NOT_FOUND)
+
 class StatistiqueViewSet(viewsets.ModelViewSet):
     queryset = Statistique.objects.all()
     serializer_class = StatistiqueSerializer

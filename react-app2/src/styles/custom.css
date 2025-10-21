@@ -100,6 +100,132 @@ html {
   transition: all 0.3s ease;
 }
 
+/* Styles pour les réponses aux commentaires */
+.comment-thread {
+  position: relative;
+}
+
+.main-comment {
+  position: relative;
+}
+
+.comment-actions {
+  border-top: 1px solid #f0f0f0;
+  padding-top: 15px;
+}
+
+/* Nouveaux styles pour les boutons d'actions améliorés */
+.comment-actions .btn {
+  border-width: 2px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.comment-actions .btn-outline-primary:hover {
+  background-color: #007bff;
+  border-color: #007bff;
+  color: #fff;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0,123,255,0.3);
+}
+
+.comment-actions .btn-outline-info:hover {
+  background-color: #17a2b8;
+  border-color: #17a2b8;
+  color: #fff;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(23,162,184,0.3);
+}
+
+.comment-actions .btn-warning:hover {
+  background-color: #ffc107;
+  border-color: #ffc107;
+  color: #212529;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(255,193,7,0.3);
+}
+
+.reply-form {
+  animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.replies-section {
+  animation: slideDown 0.3s ease;
+  border-left: 2px solid #e9ecef;
+  padding-left: 15px;
+  margin-left: 5px;
+}
+
+.reply-item {
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.reply-item:hover {
+  background-color: #f1f3f4 !important;
+  border-left-color: #007bff !important;
+}
+
+.reply-item::before {
+  content: '';
+  position: absolute;
+  left: -3px;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: linear-gradient(to bottom, #007bff, #6f42c1);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.reply-item:hover::before {
+  opacity: 1;
+}
+
+/* Animation pour les nouveaux commentaires/réponses */
+.comment-appear {
+  animation: commentAppear 0.5s ease;
+}
+
+@keyframes commentAppear {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+    background-color: #e7f3ff;
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    background-color: #fff;
+  }
+}
+
+/* Styles responsive pour les réponses */
+@media (max-width: 768px) {
+  .replies-section {
+    margin-left: 0;
+    padding-left: 10px;
+  }
+  
+  .reply-form {
+    margin-left: 0 !important;
+  }
+  
+  .comment-actions {
+    flex-wrap: wrap;
+  }
+}
+
 .like-btn:hover {
   transform: scale(1.05);
 }
@@ -110,4 +236,344 @@ html {
 
 .avatar:hover {
   transform: scale(1.1);
+}
+
+/* Améliorations pour le panneau d'interactions */
+.interaction-panel {
+  box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+  transition: all 0.3s ease;
+}
+
+.interaction-panel:hover {
+  box-shadow: 0 6px 25px rgba(0,0,0,0.12);
+  transform: translateY(-2px);
+}
+
+.stat-item {
+  transition: all 0.3s ease;
+}
+
+.stat-item:hover {
+  transform: translateY(-3px);
+}
+
+.stat-number {
+  transition: all 0.3s ease;
+}
+
+.stat-item:hover .stat-number {
+  transform: scale(1.1);
+}
+
+/* Animation pour les boutons d'action */
+.actions-row .btn {
+  transition: all 0.3s ease;
+}
+
+.actions-row .btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+}
+
+/* Animation pour les éléments dropdown */
+.dropdown-menu {
+  animation: slideDown 0.3s ease;
+}
+
+.dropdown-item {
+  transition: all 0.2s ease;
+}
+
+.dropdown-item:hover {
+  background-color: rgba(0,123,255,0.1) !important;
+  transform: translateX(5px);
+}
+
+/* Animations personnalisées */
+@keyframes slideInRight {
+  0% {
+    opacity: 0;
+    transform: translateX(100px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideDown {
+  0% {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+
+/* Animation pour le bouton like actif */
+.like-btn.btn-danger {
+  animation: pulse 0.6s ease-in-out;
+}
+
+/* Style pour le modal de partage - Affichage immédiat */
+.share-modal-overlay {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  z-index: 99999 !important;
+  backdrop-filter: blur(3px) !important;
+}
+
+.share-modal-content {
+  position: relative !important;
+  margin: auto !important;
+  transform: none !important;
+  max-height: 85vh !important;
+  overflow-y: auto !important;
+}
+
+/* Boutons de partage - effets hover rapides */
+.share-option-btn {
+  transition: transform 0.1s ease !important;
+}
+
+.share-option-btn:hover {
+  transform: scale(1.05) !important;
+}
+
+/* Styles pour la pagination des commentaires */
+.btn-outline-primary:hover {
+  background-color: #007bff !important;
+  border-color: #007bff !important;
+  color: #fff !important;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 123, 255, 0.3);
+}
+
+.btn-outline-secondary:hover {
+  background-color: #6c757d !important;
+  border-color: #6c757d !important;
+  color: #fff !important;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(108, 117, 125, 0.3);
+}
+
+/* Animation pour les commentaires */
+.comment-item {
+  animation: slideInComment 0.4s ease-out;
+}
+
+@keyframes slideInComment {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Styles pour l'historique des interactions */
+.timeline-item {
+  animation: fadeInUp 0.3s ease-out;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(15px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.interaction-icon {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+}
+
+.timeline-item:hover .interaction-icon {
+  transform: scale(1.1);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+}
+
+.timeline-item:hover {
+  transform: translateX(5px);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Scrollbar personnalisée pour l'historique */
+.timeline::-webkit-scrollbar {
+  width: 8px;
+}
+
+.timeline::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 10px;
+}
+
+.timeline::-webkit-scrollbar-thumb {
+  background: #dc2626;
+  border-radius: 10px;
+}
+
+.timeline::-webkit-scrollbar-thumb:hover {
+  background: #b91c1c;
+}
+
+/* Styles pour les tooltips d'interactions */
+.stat-item:hover {
+  transform: translateY(-2px);
+}
+
+.interaction-tooltip {
+  animation: fadeInUp 0.2s ease-out !important;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+/* Flèche du tooltip */
+.interaction-tooltip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-top-color: #fff;
+}
+
+/* Mini avatars dans les tooltips */
+.mini-avatar {
+  transition: transform 0.2s ease;
+}
+
+.tooltip-item:hover .mini-avatar {
+  transform: scale(1.1);
+}
+
+/* Animation pour les éléments du tooltip */
+.tooltip-item {
+  transition: background-color 0.2s ease;
+  padding: 4px;
+  border-radius: 6px;
+}
+
+.tooltip-item:hover {
+  background-color: #f8f9fa;
+}
+
+/* Responsive design pour les interactions */
+@media (max-width: 768px) {
+  .interaction-panel {
+    padding: 15px !important;
+    margin: 0 10px !important;
+  }
+  
+  .stats-row {
+    gap: 15px !important;
+  }
+  
+  .stat-item {
+    flex: 1;
+    min-width: 80px;
+  }
+  
+  .stat-number {
+    font-size: 1.3rem !important;
+  }
+  
+  .actions-row {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 15px !important;
+  }
+  
+  .actions-row .btn {
+    width: 100% !important;
+  }
+  
+  /* Boutons de partage responsive */
+  .actions-row .d-flex {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+  
+  .actions-row .btn-sm {
+    width: 100% !important;
+    margin-bottom: 8px;
+    min-width: auto !important;
+  }
+
+  /* Boutons de pagination responsive */
+  .btn-outline-primary, .btn-outline-secondary {
+    width: 100% !important;
+    margin: 5px 0 !important;
+  }
+}
+
+@media (max-width: 576px) {
+  .interaction-panel {
+    border-radius: 10px !important;
+    padding: 12px !important;
+  }
+  
+  .stats-row {
+    gap: 10px !important;
+  }
+  
+  .stat-number {
+    font-size: 1.2rem !important;
+  }
+  
+  .stat-label {
+    font-size: 0.8rem !important;
+  }
+  
+  /* Modal de partage mobile */
+  .share-modal {
+    padding: 15px !important;
+    margin: 5px !important;
+    border-radius: 15px !important;
+  }
+  
+  .share-modal h4 {
+    font-size: 1.1rem !important;
+  }
+  
+  .share-option-btn {
+    padding: 12px 8px !important;
+    font-size: 0.9rem !important;
+  }
+  
+  .share-option-btn i {
+    font-size: 1.3rem !important;
+  }
 }
