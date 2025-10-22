@@ -25,62 +25,183 @@ const Profile = () => {
   const [isEnabling, setIsEnabling] = useState(false);
   const [hasPendingRequest, setHasPendingRequest] = useState(false);  
   const [showDemandeModal, setShowDemandeModal] = useState(false);  
-  const [raison, setRaison] = useState('');  
+  const [raison, setRaison] = useState('');
+  const [scoreData, setScoreData] = useState(null);
+  const [loadingScore, setLoadingScore] = useState(false);
+  const [showScoreDetails, setShowScoreDetails] = useState(false);
+  
   const navigate = useNavigate();
   const fileInputRef = React.useRef(null);
 
-  useEffect(() => {
+  /*useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) {
       navigate('/login');
       return;
     }
     fetchProfile(token);
-  }, [navigate]);
+    // ✨ NOUVEAU : Charger le score si c'est un user
+    if (user?.role === 'user') {
+      fetchScoreArtiste(token);
+    }
+  }, [navigate, user?.role]);*/
 
-// Remplace ta fonction disable2FA dans Profile.jsx par celle-ci :
-
-const disable2FA = async () => {
-  if (!window.confirm('Êtes-vous sûr de vouloir désactiver le 2FA ? Cela rendra votre compte moins sécurisé.')) {
+  useEffect(() => {
+  const token = localStorage.getItem('token');
+  if (!token) {
+    navigate('/login');
     return;
   }
-  
+  fetchProfile(token);
+}, [navigate]);
+
+// useEffect 2 : Charger le score APRÈS que user soit défini
+useEffect(() => {
   const token = localStorage.getItem('token');
-  setIsSubmitting(true);  // Utilise isSubmitting au lieu de setUpdating
-  
+  if (user && user.role === 'user' && token) {
+    console.log('✅ User détecté:', user.email, '- Role:', user.role);
+    console.log('🔄 Chargement du score pour:', user.email);
+    fetchScoreArtiste(token);
+  } else {
+    console.log('⚠️ Conditions non remplies:', {
+      hasUser: !!user,
+      role: user?.role,
+      hasToken: !!token
+    });
+  }
+}, [user?.id, user?.role]);
+
+
+  // ✨ NOUVEAU : Fonction pour récupérer le score artiste
+const fetchScoreArtiste = async (token) => {
+  setLoadingScore(true);
   try {
-    const response = await axios.post(
-      'http://localhost:8000/api/utilisateurs/disable_2fa/', 
-      {}, 
+    console.log('📡 Appel API score artiste...');
+    const response = await axios.get(
+      'http://localhost:8000/api/utilisateurs/mon_score_artiste/',
       {
         headers: { Authorization: `Token ${token}` },
         withCredentials: true
       }
     );
-    
-    // Mettre à jour l'état local
-    setUser({ ...user, two_factor_enabled: false });
-    
-    // Mettre à jour le contexte d'authentification
-    updateUser({ ...user, two_factor_enabled: false });
-    
-    setModal({ 
-      show: true, 
-      title: 'Succès !', 
-      message: '2FA désactivé ! Votre prochaine connexion ne nécessitera pas de code.', 
-      type: 'success' 
-    });
+    console.log('✅ Score reçu:', response.data);
+    setScoreData(response.data);
   } catch (error) {
-    setModal({ 
-      show: true, 
-      title: 'Erreur', 
-      message: error.response?.data?.error || 'Erreur lors de la désactivation', 
-      type: 'error' 
-    });
+    console.error('❌ Erreur chargement score:', error);
+    console.error('Détails:', error.response?.data);
+    
+    // Si erreur 404 ou 403, ne pas bloquer l'affichage
+    if (error.response?.status === 404 || error.response?.status === 403) {
+      console.warn('⚠️ Score non disponible pour cet utilisateur');
+    }
   } finally {
-    setIsSubmitting(false);
+    setLoadingScore(false);
   }
 };
+
+  // ✨ NOUVEAU : Fonction pour rafraîchir le score
+  const refreshScore = async () => {
+    const token = localStorage.getItem('token');
+    await fetchScoreArtiste(token);
+  };
+
+const formatCritereName = (key) => {
+  const names = {
+    'artistes_suivis': 'Artistes Suivis',
+    'consultations_oeuvres': 'Consultations d\'Œuvres',
+    'contacts_artistes': 'Contacts avec Artistes',
+    'photo_profil': 'Photo de Profil',
+    'deux_facteurs': 'Authentification 2FA',
+    'profil_complet': 'Profil Complet'
+  };
+  return names[key] || key.replace(/_/g, ' ').charAt(0).toUpperCase() + key.replace(/_/g, ' ').slice(1);
+};
+
+const formatValeur = (key, detail) => {
+  // Cas booléens (photo, 2FA)
+  if (typeof detail.valeur === 'boolean') {
+    return detail.valeur ? '✅ Activé' : '❌ Non activé';
+  }
+  
+  // Cas profil complet (pourcentage)
+  if (key === 'profil_complet') {
+    return `Complété à ${detail.valeur} (${detail.champs_remplis} champs)`;
+  }
+  
+  // Cas numériques
+  switch(key) {
+    case 'artistes_suivis':
+      return `${detail.valeur} artiste${detail.valeur > 1 ? 's' : ''}`;
+    
+    case 'consultations_oeuvres':
+      return `${detail.valeur} œuvre${detail.valeur > 1 ? 's' : ''} consultée${detail.valeur > 1 ? 's' : ''}`;
+    
+    case 'contacts_artistes':
+      return `${detail.valeur} message${detail.valeur > 1 ? 's' : ''}`;
+    
+    default:
+      return String(detail.valeur);
+  }
+};
+
+const getCritereIcon = (key) => {
+  const icons = {
+    'artistes_suivis': '👥',
+    'consultations_oeuvres': '👁️',
+    'contacts_artistes': '💬',
+    'photo_profil': '📸',
+    'deux_facteurs': '🔐',
+    'profil_complet': '✅'
+  };
+  return icons[key] || '•';
+};
+
+const getScoreColor = (percentage) => {
+  if (percentage >= 80) return '#28a745';
+  if (percentage >= 60) return '#ffc107';
+  if (percentage >= 40) return '#fd7e14';
+  return '#6c757d';
+};
+
+  const disable2FA = async () => {
+    if (!window.confirm('Êtes-vous sûr de vouloir désactiver le 2FA ? Cela rendra votre compte moins sécurisé.')) {
+      return;
+    }
+    
+    const token = localStorage.getItem('token');
+    setIsSubmitting(true);
+    
+    try {
+      const response = await axios.post(
+        'http://localhost:8000/api/utilisateurs/disable_2fa/', 
+        {}, 
+        {
+          headers: { Authorization: `Token ${token}` },
+          withCredentials: true
+        }
+      );
+      
+      setUser({ ...user, two_factor_enabled: false });
+      updateUser({ ...user, two_factor_enabled: false });
+      
+      setModal({ 
+        show: true, 
+        title: 'Succès !', 
+        message: '2FA désactivé ! Votre prochaine connexion ne nécessitera pas de code.', 
+        type: 'success' 
+      });
+    } catch (error) {
+      setModal({ 
+        show: true, 
+        title: 'Erreur', 
+        message: error.response?.data?.error || 'Erreur lors de la désactivation', 
+        type: 'error' 
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const fetchProfile = async (token) => {
     try {
       const response = await axios.get('http://localhost:8000/api/utilisateurs/profile/', {
@@ -162,6 +283,8 @@ const disable2FA = async () => {
       setSelectedImage(null);
       fileInputRef.current.value = '';
       updateUser(response.data);
+      // ✨ Rafraîchir le score après upload
+      refreshScore();
     } catch (error) {
       setModal({ show: true, title: 'Erreur', message: error.response?.data?.error || 'Échec upload', type: 'error' });
     } finally {
@@ -184,8 +307,9 @@ const disable2FA = async () => {
       });
       setUser(response.data);
       setModal({ show: true, title: 'Succès !', message: 'Profil mis à jour !', type: 'success' });
-      // Mettre à jour le contexte d'authentification aussi
       updateUser(response.data);
+      // ✨ Rafraîchir le score après mise à jour
+      refreshScore();
     } catch (error) {
       setModal({ show: true, title: 'Erreur', message: error.response?.data?.error || 'Échec mise à jour', type: 'error' });
     } finally {
@@ -253,99 +377,52 @@ const disable2FA = async () => {
     setRaison('');
   };
 
-  const generate2FA = async () => {
-    const token = localStorage.getItem('token');
-    try {
-      const response = await axios.post('http://localhost:8000/api/utilisateurs/generate_2fa/', {}, {
-        headers: { Authorization: `Token ${token}` },
-        withCredentials: true
-      });
-      setSecret(response.data.secret);
-      setQrCode(response.data.qr_code);
-      setShowQRModal(true);
-    } catch (error) {
-      setModal({ show: true, title: 'Erreur', message: error.response?.data?.error || 'Échec génération 2FA', type: 'error' });
+  const enable2FA = async () => {
+    if (!window.confirm('Êtes-vous sûr de vouloir activer le 2FA ? Vous devrez scanner un QR code à la prochaine connexion.')) {
+      return;
     }
-  };
-const enable2FA = async () => {
-  if (!window.confirm('Êtes-vous sûr de vouloir activer le 2FA ? Vous devrez scanner un QR code à la prochaine connexion.')) {
-    return;
-  }
-  
-  const token = localStorage.getItem('token');
-  setIsEnabling(true);
-  
-  try {
-    const response = await axios.post(
-      'http://localhost:8000/api/utilisateurs/enable_2fa/', 
-      {}, 
-      {
-        headers: { Authorization: `Token ${token}` },
-        withCredentials: true
-      }
-    );
     
-    // Mettre à jour l'état local
-    setUser({ ...user, two_factor_enabled: true });
-    
-    // Mettre à jour le contexte d'authentification
-    updateUser({ ...user, two_factor_enabled: true });
-    
-    setModal({ 
-      show: true, 
-      title: 'Succès !', 
-      message: '2FA activé ! Reconnectez-vous pour scanner le QR code.', 
-      type: 'success' 
-    });
-  } catch (error) {
-    setModal({ 
-      show: true, 
-      title: 'Erreur', 
-      message: error.response?.data?.error || 'Erreur lors de l\'activation', 
-      type: 'error' 
-    });
-  } finally {
-    setIsEnabling(false);
-  }
-};
-  /*const enable2FA = async () => {
     const token = localStorage.getItem('token');
     setIsEnabling(true);
+    
     try {
-      await axios.post('http://localhost:8000/api/utilisateurs/enable_2fa/', {
-        code: enableCode
-      }, {
-        headers: { Authorization: `Token ${token}` },
-        withCredentials: true
+      const response = await axios.post(
+        'http://localhost:8000/api/utilisateurs/enable_2fa/', 
+        {}, 
+        {
+          headers: { Authorization: `Token ${token}` },
+          withCredentials: true
+        }
+      );
+      
+      setUser({ ...user, two_factor_enabled: true });
+      updateUser({ ...user, two_factor_enabled: true });
+      
+      setModal({ 
+        show: true, 
+        title: 'Succès !', 
+        message: '2FA activé ! Reconnectez-vous pour scanner le QR code.', 
+        type: 'success' 
       });
-      setModal({ show: true, title: 'Succès !', message: '2FA activé !', type: 'success' });
-      setShowQRModal(false);
-      setEnableCode('');
-      fetchProfile(token);
+      // ✨ Rafraîchir le score après activation 2FA
+      refreshScore();
     } catch (error) {
-      setModal({ show: true, title: 'Erreur', message: error.response?.data?.error || 'Code invalide', type: 'error' });
+      setModal({ 
+        show: true, 
+        title: 'Erreur', 
+        message: error.response?.data?.error || 'Erreur lors de l\'activation', 
+        type: 'error' 
+      });
     } finally {
       setIsEnabling(false);
     }
-  };*/
-
- /* const disable2FA = async () => {
-    const token = localStorage.getItem('token');
-    try {
-      await axios.post('http://localhost:8000/api/utilisateurs/disable_2fa/', {}, {
-        headers: { Authorization: `Token ${token}` },
-        withCredentials: true
-      });
-      setModal({ show: true, title: 'Succès !', message: '2FA désactivé !', type: 'success' });
-      fetchProfile(token);
-    } catch (error) {
-      setModal({ show: true, title: 'Erreur', message: error.response?.data?.error || 'Échec désactivation', type: 'error' });
-    }
-  };*/
+  };
 
   const handleModalClose = () => {
     setModal({ ...modal, show: false });
   };
+
+
 
   if (!user) {
     return (
@@ -374,7 +451,6 @@ const enable2FA = async () => {
         title="Confirmer la suppression"
         message="Êtes-vous sûr de vouloir supprimer votre compte ? Cette action est irréversible."
       />
-
 
       <div className="space">
         <div className="container">
@@ -438,13 +514,13 @@ const enable2FA = async () => {
                       <i className="fas fa-camera"></i>
                     </button>
                   </div>
-                    <input 
-                      type="file" 
-                      ref={fileInputRef}
-                      onChange={handleImageChange} 
-                      accept="image/*" 
-                      style={{ display: 'none' }} 
-                    />
+                  <input 
+                    type="file" 
+                    ref={fileInputRef}
+                    onChange={handleImageChange} 
+                    accept="image/*" 
+                    style={{ display: 'none' }} 
+                  />
                   {selectedImage && (
                     <button 
                       onClick={uploadImage} 
@@ -474,6 +550,127 @@ const enable2FA = async () => {
                 </div>
               </div>
 
+              {/* ✨ NOUVEAU : Widget Score Artiste (seulement pour les users) */}
+              {user.role === 'user' && scoreData && (
+                <div style={{ 
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', 
+                  padding: '25px', 
+                  borderRadius: '15px', 
+                  marginBottom: '20px',
+                  color: '#fff',
+                  boxShadow: '0 10px 30px rgba(102, 126, 234, 0.3)',
+                  position: 'relative',
+                  overflow: 'hidden'
+                }}>
+                  {/* Badge dans le coin */}
+                  {scoreData.badge && (
+                    <div style={{
+                      position: 'absolute',
+                      top: '15px',
+                      right: '15px',
+                      background: 'linear-gradient(135deg, #FFD700 0%, #FFA500 100%)',
+                      padding: '8px 15px',
+                      borderRadius: '25px',
+                      fontSize: '0.85rem',
+                      fontWeight: '700',
+                      color: '#fff',
+                      boxShadow: '0 4px 15px rgba(255, 165, 0, 0.4)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      animation: 'pulse 2s ease-in-out infinite'
+                    }}>
+                      <span style={{ fontSize: '1.2rem' }}>🏆</span>
+                      {scoreData.badge === 'futur_artiste' ? 'Futur Artiste' : 'Potentiel Artiste'}
+                    </div>
+                  )}
+
+                  <div className="d-flex justify-content-between align-items-center mb-3">
+                    <h5 className="mb-0" style={{ color: '#fff' }}>
+                      <i className="fas fa-chart-line me-2"></i>Score Artiste
+                    </h5>
+                    <button
+                      onClick={refreshScore}
+                      disabled={loadingScore}
+                      style={{
+                        background: 'rgba(255,255,255,0.2)',
+                        border: 'none',
+                        borderRadius: '50%',
+                        width: '35px',
+                        height: '35px',
+                        color: '#fff',
+                        cursor: 'pointer',
+                        transition: 'all 0.3s'
+                      }}
+                      title="Rafraîchir"
+                    >
+                      <i className={`fas fa-sync-alt ${loadingScore ? 'fa-spin' : ''}`}></i>
+                    </button>
+                  </div>
+
+                  {/* Score principal */}
+                  <div className="text-center mb-3">
+                    <div style={{
+                      fontSize: '3.5rem',
+                      fontWeight: 'bold',
+                      lineHeight: '1'
+                    }}>
+                      {scoreData.score}
+                      <span style={{ fontSize: '2rem', opacity: 0.8 }}>/100</span>
+                    </div>
+                    <div style={{
+                      fontSize: '1.1rem',
+                      marginTop: '10px',
+                      opacity: 0.95
+                    }}>
+                      {scoreData.categorie}
+                    </div>
+                  </div>
+
+                  {/* Barre de progression */}
+                  <div style={{
+                    background: 'rgba(255,255,255,0.2)',
+                    borderRadius: '10px',
+                    height: '12px',
+                    overflow: 'hidden',
+                    marginBottom: '15px'
+                  }}>
+                    <div style={{
+                      background: '#fff',
+                      height: '100%',
+                      width: `${scoreData.score}%`,
+                      transition: 'width 0.5s ease',
+                      borderRadius: '10px'
+                    }}></div>
+                  </div>
+
+                  {/* Message personnalisé */}
+                  <p style={{
+                    fontSize: '0.9rem',
+                    marginBottom: '15px',
+                    opacity: 0.95,
+                    lineHeight: '1.5'
+                  }}>
+                    {scoreData.message}
+                  </p>
+
+                  {/* Bouton détails */}
+                  <button
+                    onClick={() => setShowScoreDetails(true)}
+                    className="btn btn-sm w-100"
+                    style={{
+                      background: 'rgba(255,255,255,0.95)',
+                      color: '#667eea',
+                      border: 'none',
+                      fontWeight: '600'
+                    }}
+                  >
+                    <i className="fas fa-info-circle me-2"></i>
+                    Voir les détails
+                  </button>
+                </div>
+              )}
+
               {user.role === 'user' && (
                 <div style={{ background: '#F8F7F4', padding: '25px', borderRadius: '15px', marginBottom: '20px' }}>
                   <h5 className="mb-3"><i className="fas fa-star me-2" style={{ color: 'var(--theme-color)' }}></i>Devenir Artiste</h5>
@@ -490,74 +687,74 @@ const enable2FA = async () => {
                   </button>
                 </div>
               )}
-                  </div>
+            </div>
 
             <div className="col-lg-8">
               <div style={{ background: '#fff', padding: '40px', borderRadius: '15px', boxShadow: '0 5px 20px rgba(0,0,0,0.1)', marginBottom: '30px' }}>
                 <h4 className="mb-4"><i className="fas fa-user-edit me-2" style={{ color: 'var(--theme-color)' }}></i>Informations personnelles</h4>
-                  <form onSubmit={handleUpdateProfile}>
-                    <div className="row">
-                      <div className="col-md-6 mb-3">
+                <form onSubmit={handleUpdateProfile}>
+                  <div className="row">
+                    <div className="col-md-6 mb-3">
                       <label className="form-label">Prénom</label>
-                        <input 
-                          type="text" 
-                          value={prenom} 
-                          onChange={(e) => setPrenom(e.target.value)} 
-                          className="form-control" 
+                      <input 
+                        type="text" 
+                        value={prenom} 
+                        onChange={(e) => setPrenom(e.target.value)} 
+                        className="form-control" 
                         style={{ borderRadius: '10px', padding: '12px' }}
-                          required 
-                        />
-                      </div>
-                      <div className="col-md-6 mb-3">
+                        required 
+                      />
+                    </div>
+                    <div className="col-md-6 mb-3">
                       <label className="form-label">Nom</label>
-                        <input 
-                          type="text" 
-                          value={nom} 
-                          onChange={(e) => setNom(e.target.value)} 
-                          className="form-control" 
+                      <input 
+                        type="text" 
+                        value={nom} 
+                        onChange={(e) => setNom(e.target.value)} 
+                        className="form-control" 
                         style={{ borderRadius: '10px', padding: '12px' }}
-                          required 
-                        />
-                      </div>
+                        required 
+                      />
+                    </div>
                     <div className="col-12 mb-3">
                       <label className="form-label">Téléphone</label>
-                        <input 
-                          type="tel" 
-                          value={telephone} 
-                          onChange={(e) => setTelephone(e.target.value)} 
-                          className="form-control" 
+                      <input 
+                        type="tel" 
+                        value={telephone} 
+                        onChange={(e) => setTelephone(e.target.value)} 
+                        className="form-control" 
                         style={{ borderRadius: '10px', padding: '12px' }}
                         placeholder="+33 1 23 45 67 89"
-                        />
-                      </div>
+                      />
                     </div>
-                    <button 
-                      type="submit" 
-                      disabled={isSubmitting}
+                  </div>
+                  <button 
+                    type="submit" 
+                    disabled={isSubmitting}
                     className="btn mt-2"
-                    >
-                      {isSubmitting ? 'Mise à jour...' : 'Mettre à jour'}
-                    </button>
-                  </form>
-                    </div>
+                  >
+                    {isSubmitting ? 'Mise à jour...' : 'Mettre à jour'}
+                  </button>
+                </form>
+              </div>
 
               <div style={{ background: '#fff', padding: '40px', borderRadius: '15px', boxShadow: '0 5px 20px rgba(0,0,0,0.1)', marginBottom: '30px' }}>
                 <h4 className="mb-4"><i className="fas fa-shield-alt me-2" style={{ color: 'var(--theme-color)' }}></i>Sécurité</h4>
                 <div className="d-flex justify-content-between align-items-center" style={{ padding: '15px', background: '#F8F7F4', borderRadius: '10px' }}>
-                      <div>
+                  <div>
                     <h6 className="mb-1">Authentification à deux facteurs</h6>
                     <p style={{ fontSize: '0.85em', color: '#7B7E86', marginBottom: 0 }}>
                       {user.two_factor_enabled ? 'Activée' : 'Désactivée'}
                     </p>
                   </div>
                   {user.two_factor_enabled ? (
-                          <button 
+                    <button 
                       onClick={disable2FA}
                       className="btn btn-sm"
                       style={{ backgroundColor: '#dc3545', borderColor: '#dc3545', color: '#fff' }}
                     >
                       Désactiver
-                          </button>
+                    </button>
                   ) : (
                     <button 
                       onClick={enable2FA}
@@ -587,6 +784,341 @@ const enable2FA = async () => {
         </div>
       </div>
 
+      {/* ✨ NOUVEAU : Modal Détails du Score */}
+     {showScoreDetails && scoreData && (
+  <div style={{ 
+    position: 'fixed', 
+    top: 0, 
+    left: 0, 
+    right: 0, 
+    bottom: 0, 
+    background: 'rgba(0,0,0,0.5)', 
+    zIndex: 9999, 
+    display: 'flex', 
+    alignItems: 'center', 
+    justifyContent: 'center',
+    padding: '20px',
+    overflowY: 'auto'
+  }}>
+    <div style={{ 
+      background: 'white', 
+      padding: '40px', 
+      borderRadius: '15px', 
+      maxWidth: '800px', 
+      width: '100%',
+      maxHeight: '90vh',
+      overflowY: 'auto',
+      boxShadow: '0 10px 40px rgba(0,0,0,0.3)'
+    }}>
+      {/* Header */}
+      <div className="d-flex justify-content-between align-items-center mb-4">
+        <h4 className="mb-0">📊 Détails de votre Score Artiste</h4>
+        <button
+          onClick={() => setShowScoreDetails(false)}
+          style={{
+            background: 'transparent',
+            border: 'none',
+            fontSize: '1.8rem',
+            cursor: 'pointer',
+            color: '#7B7E86',
+            lineHeight: '1'
+          }}
+        >
+          ×
+        </button>
+      </div>
+
+      {/* Score global */}
+      <div style={{
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        padding: '30px',
+        borderRadius: '15px',
+        color: '#fff',
+        marginBottom: '30px',
+        textAlign: 'center'
+      }}>
+        <div style={{ fontSize: '4rem', fontWeight: 'bold', lineHeight: '1' }}>
+          {scoreData.score}
+          <span style={{ fontSize: '2rem', opacity: 0.8 }}>/100</span>
+        </div>
+        <div style={{ 
+          fontSize: '1.3rem', 
+          marginTop: '15px',
+          fontWeight: '600',
+          letterSpacing: '0.5px'
+        }}>
+          {scoreData.categorie}
+        </div>
+        <div style={{
+          background: 'rgba(255,255,255,0.2)',
+          borderRadius: '10px',
+          height: '10px',
+          overflow: 'hidden',
+          marginTop: '20px',
+          maxWidth: '400px',
+          margin: '20px auto 0'
+        }}>
+          <div style={{
+            background: '#fff',
+            height: '100%',
+            width: `${scoreData.score}%`,
+            transition: 'width 0.5s ease',
+            borderRadius: '10px',
+            boxShadow: '0 0 10px rgba(255,255,255,0.5)'
+          }}></div>
+        </div>
+      </div>
+
+      {/* Message personnalisé */}
+      {scoreData.message && (
+        <div style={{
+          background: '#f8f9fa',
+          padding: '20px',
+          borderRadius: '10px',
+          marginBottom: '30px',
+          borderLeft: '4px solid #667eea'
+        }}>
+          <p style={{ 
+            fontSize: '1rem', 
+            marginBottom: 0,
+            color: '#2C3E50',
+            lineHeight: '1.6'
+          }}>
+            {scoreData.message}
+          </p>
+        </div>
+      )}
+
+      {/* Détails des critères */}
+      <h5 className="mb-3" style={{ 
+        fontSize: '1.2rem', 
+        fontWeight: '600',
+        color: '#2C3E50',
+        borderBottom: '2px solid #e9ecef',
+        paddingBottom: '10px'
+      }}>
+        🎯 Analyse Détaillée des Critères
+      </h5>
+      
+      <div className="mb-4">
+        {Object.entries(scoreData.details).map(([key, detail]) => {
+          const percentage = (detail.score / detail.max) * 100;
+          const icon = getCritereIcon(key);
+          const critereName = formatCritereName(key);
+          const valeurFormatee = formatValeur(key, detail);
+          
+          return (
+            <div 
+              key={key} 
+              style={{ 
+                marginBottom: '20px',
+                background: '#f8f9fa',
+                padding: '15px',
+                borderRadius: '10px',
+                border: '1px solid #e9ecef'
+              }}
+            >
+              <div className="d-flex justify-content-between align-items-center mb-2">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <span style={{ fontSize: '1.5rem' }}>{icon}</span>
+                  <span style={{ 
+                    fontSize: '1rem', 
+                    fontWeight: '600',
+                    color: '#2C3E50'
+                  }}>
+                    {critereName}
+                  </span>
+                </div>
+                <span style={{ 
+                  fontSize: '0.95rem', 
+                  color: '#7B7E86',
+                  fontWeight: '600'
+                }}>
+                  {detail.score}/{detail.max} pts
+                </span>
+              </div>
+              
+              {/* Barre de progression */}
+              <div style={{
+                background: '#e9ecef',
+                borderRadius: '10px',
+                height: '10px',
+                overflow: 'hidden',
+                marginBottom: '10px'
+              }}>
+                <div style={{
+                  background: getScoreColor(percentage),
+                  height: '100%',
+                  width: `${percentage}%`,
+                  transition: 'width 0.5s ease',
+                  borderRadius: '10px'
+                }}></div>
+              </div>
+              
+              {/* Valeur */}
+              <div style={{ 
+                fontSize: '0.9rem', 
+                color: '#6c757d',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px'
+              }}>
+                <i className="fas fa-info-circle" style={{ fontSize: '0.85rem' }}></i>
+                {valeurFormatee}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Suggestions d'amélioration */}
+      {scoreData.suggestions && scoreData.suggestions.length > 0 && (
+        <>
+          <h5 className="mb-3" style={{ 
+            fontSize: '1.2rem', 
+            fontWeight: '600',
+            color: '#2C3E50',
+            borderBottom: '2px solid #e9ecef',
+            paddingBottom: '10px'
+          }}>
+            💡 Suggestions pour Progresser
+          </h5>
+          
+          <div className="mb-4">
+            {scoreData.suggestions.map((suggestion, index) => {
+              const priorityConfig = {
+                'haute': { color: '#dc3545', bg: '#ffe6e6', icon: '🔥' },
+                'moyenne': { color: '#ffc107', bg: '#fff9e6', icon: '⭐' },
+                'basse': { color: '#28a745', bg: '#e6ffe6', icon: '💡' }
+              };
+              
+              const config = priorityConfig[suggestion.priorite] || priorityConfig['moyenne'];
+              
+              return (
+                <div 
+                  key={index}
+                  style={{
+                    background: config.bg,
+                    padding: '20px',
+                    borderRadius: '12px',
+                    marginBottom: '15px',
+                    borderLeft: `5px solid ${config.color}`,
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
+                  }}
+                >
+                  <div className="d-flex justify-content-between align-items-start mb-3">
+                    <div style={{ flex: 1 }}>
+                      <div style={{ 
+                        fontSize: '1.1rem',
+                        fontWeight: '600',
+                        color: '#2C3E50',
+                        marginBottom: '8px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px'
+                      }}>
+                        <span>{config.icon}</span>
+                        {suggestion.action}
+                      </div>
+                      <p style={{ 
+                        fontSize: '0.9rem', 
+                        color: '#6c757d', 
+                        marginBottom: '12px',
+                        lineHeight: '1.5'
+                      }}>
+                        {suggestion.description}
+                      </p>
+                    </div>
+                    <span style={{
+                      background: config.color,
+                      color: '#fff',
+                      padding: '4px 12px',
+                      borderRadius: '15px',
+                      fontSize: '0.75rem',
+                      fontWeight: '700',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px',
+                      whiteSpace: 'nowrap',
+                      marginLeft: '10px'
+                    }}>
+                      {suggestion.priorite}
+                    </span>
+                  </div>
+                  
+                  <div style={{
+                    background: '#fff',
+                    padding: '10px 15px',
+                    borderRadius: '8px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    fontSize: '0.9rem',
+                    fontWeight: '700',
+                    color: '#28a745',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
+                  }}>
+                    <i className="fas fa-arrow-up"></i>
+                    {suggestion.points}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
+
+      {/* Badge potentiel */}
+      {scoreData.badge && (
+        <div style={{
+          background: 'linear-gradient(135deg, #FFD700 0%, #FFA500 100%)',
+          padding: '25px',
+          borderRadius: '15px',
+          textAlign: 'center',
+          color: '#fff',
+          marginTop: '25px',
+          boxShadow: '0 4px 15px rgba(255, 165, 0, 0.3)'
+        }}>
+          <div style={{ 
+            fontSize: '3rem', 
+            marginBottom: '15px'
+          }}>
+            🏆
+          </div>
+          <h5 className="mb-2" style={{ 
+            color: '#fff', 
+            fontSize: '1.3rem',
+            fontWeight: '700'
+          }}>
+            Badge Débloqué !
+          </h5>
+          <p style={{ 
+            fontSize: '1rem', 
+            marginBottom: 0, 
+            opacity: 0.95,
+            fontWeight: '500'
+          }}>
+            {scoreData.badge === 'futur_artiste' ? '🌟 Futur Artiste' : '🎨 Potentiel Artiste'}
+          </p>
+        </div>
+      )}
+
+      {/* Bouton fermer */}
+      <button
+        onClick={() => setShowScoreDetails(false)}
+        className="btn w-100 mt-4"
+        style={{
+          padding: '15px',
+          fontSize: '1rem',
+          fontWeight: '600'
+        }}
+      >
+        <i className="fas fa-times me-2"></i>
+        Fermer
+      </button>
+    </div>
+  </div>
+)}
+
       {/* Modal QR Code 2FA */}
       {showQRModal && (
         <div style={{ 
@@ -607,7 +1139,7 @@ const enable2FA = async () => {
             padding: '40px', 
             borderRadius: '15px', 
             maxWidth: '400px',
-                  width: '100%',
+            width: '100%',
             boxShadow: '0 10px 40px rgba(0,0,0,0.3)'
           }}>
             <h4 className="text-center mb-4">Activer 2FA</h4>
@@ -628,7 +1160,7 @@ const enable2FA = async () => {
                 style={{ fontSize: '1.5em', letterSpacing: '0.5em', borderRadius: '10px' }}
                 maxLength="6"
               />
-                </div>
+            </div>
             <div className="d-flex gap-2">
               <button 
                 onClick={() => setShowQRModal(false)}

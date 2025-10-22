@@ -3,6 +3,7 @@ from .models import Utilisateur, Oeuvre, Galerie, Interaction, Statistique, Dema
 from django.contrib.auth.hashers import make_password  
 import pyotp
 from .models import Utilisateur, Oeuvre, Galerie, Interaction, Statistique, DemandeRole, GalerieInvitation, Suivi
+from .models import ConsultationOeuvre, PartageOeuvre, ContactArtiste
 
 class UtilisateurSerializer(serializers.ModelSerializer):
     password_confirm = serializers.CharField(write_only=True, required=False)
@@ -109,9 +110,85 @@ class GalerieInvitationSerializer(serializers.ModelSerializer):
         return f"{obj.utilisateur.prenom} {obj.utilisateur.nom}"
 
 class InteractionSerializer(serializers.ModelSerializer):
+    utilisateur_nom = serializers.SerializerMethodField()
+    oeuvre_titre = serializers.SerializerMethodField()
+    replies = serializers.SerializerMethodField()
+    parent_id = serializers.IntegerField(source='parent.id', read_only=True)
+    
     class Meta:
         model = Interaction
-        fields = '__all__'
+        fields = [
+            'id', 'type', 'utilisateur', 'utilisateur_nom', 
+            'oeuvre', 'oeuvre_titre', 'contenu', 'plateforme_partage', 
+            'date', 'parent', 'parent_id', 'replies'
+        ]
+        read_only_fields = ['id', 'date', 'utilisateur_nom', 'oeuvre_titre', 'parent_id', 'replies']
+    
+    def get_utilisateur_nom(self, obj):
+        return f"{obj.utilisateur.prenom} {obj.utilisateur.nom}"
+    
+    def get_oeuvre_titre(self, obj):
+        return obj.oeuvre.titre
+    
+    def get_replies(self, obj):
+        """Récupérer les réponses pour un commentaire (seulement si c'est un commentaire principal)"""
+        if obj.type == 'commentaire' and obj.parent is None:
+            replies = obj.reponses.all().order_by('date')
+            # Éviter la récursion infinie en utilisant un serializer simplifié
+            return [{
+                'id': reply.id,
+                'utilisateur_nom': f"{reply.utilisateur.prenom} {reply.utilisateur.nom}",
+                'contenu': reply.contenu,
+                'date': reply.date,
+                'parent_id': reply.parent.id if reply.parent else None
+            } for reply in replies]
+        return []
+    
+    def validate(self, data):
+        # Validation pour les commentaires
+        if data.get('type') == 'commentaire':
+            if not data.get('contenu', '').strip():
+                raise serializers.ValidationError("Le contenu est obligatoire pour un commentaire.")
+        
+        # Validation pour les partages
+        if data.get('type') == 'partage':
+            if not data.get('plateforme_partage'):
+                raise serializers.ValidationError("La plateforme est obligatoire pour un partage.")
+            # Nettoyer le contenu pour les partages (pas nécessaire)
+            data['contenu'] = ''
+        
+        # Nettoyer plateforme_partage pour like et commentaire
+        if data.get('type') in ['like', 'commentaire']:
+            data['plateforme_partage'] = ''
+            
+        return data
+
+class InteractionCreateSerializer(serializers.ModelSerializer):
+    """Serializer spécialisé pour la création d'interactions"""
+    
+    class Meta:
+        model = Interaction
+        fields = ['type', 'oeuvre', 'contenu', 'plateforme_partage', 'parent']
+    
+    def validate(self, data):
+        # Validation selon le type
+        if data.get('type') == 'commentaire':
+            if not data.get('contenu', '').strip():
+                raise serializers.ValidationError("Le contenu est obligatoire pour un commentaire.")
+        elif data.get('type') == 'partage':
+            if not data.get('plateforme_partage'):
+                raise serializers.ValidationError("La plateforme est obligatoire pour un partage.")
+        
+        return data
+
+class InteractionStatsSerializer(serializers.Serializer):
+    """Serializer pour les statistiques d'interactions"""
+    oeuvre_id = serializers.IntegerField()
+    oeuvre_titre = serializers.CharField()
+    total_likes = serializers.IntegerField()
+    total_commentaires = serializers.IntegerField()
+    total_partages = serializers.IntegerField()
+    total_interactions = serializers.IntegerField()
 
 class StatistiqueSerializer(serializers.ModelSerializer):
     class Meta:
@@ -185,3 +262,43 @@ class SuiviSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Vous ne pouvez suivre que des artistes")
         
         return data
+    
+class ConsultationOeuvreSerializer(serializers.ModelSerializer):
+    utilisateur_email = serializers.EmailField(source='utilisateur.email', read_only=True)
+    
+    class Meta:
+        model = ConsultationOeuvre
+        fields = ['id', 'utilisateur', 'utilisateur_email', 'oeuvre_id', 'date_consultation']
+        read_only_fields = ['id', 'date_consultation']
+
+
+class PartageOeuvreSerializer(serializers.ModelSerializer):
+    utilisateur_email = serializers.EmailField(source='utilisateur.email', read_only=True)
+    plateforme_display = serializers.CharField(source='get_plateforme_display', read_only=True)
+    
+    class Meta:
+        model = PartageOeuvre
+        fields = ['id', 'utilisateur', 'utilisateur_email', 'oeuvre_id', 'plateforme', 'plateforme_display', 'date_partage']
+        read_only_fields = ['id', 'date_partage']
+
+
+class ContactArtisteSerializer(serializers.ModelSerializer):
+    utilisateur_nom = serializers.SerializerMethodField()
+    artiste_nom = serializers.SerializerMethodField()
+    utilisateur_email = serializers.EmailField(source='utilisateur.email', read_only=True)
+    artiste_email = serializers.EmailField(source='artiste.email', read_only=True)
+    
+    class Meta:
+        model = ContactArtiste
+        fields = [
+            'id', 'utilisateur', 'utilisateur_nom', 'utilisateur_email',
+            'artiste', 'artiste_nom', 'artiste_email',
+            'sujet', 'message', 'date_contact', 'lu'
+        ]
+        read_only_fields = ['id', 'date_contact']
+    
+    def get_utilisateur_nom(self, obj):
+        return f"{obj.utilisateur.prenom} {obj.utilisateur.nom}"
+    
+    def get_artiste_nom(self, obj):
+        return f"{obj.artiste.prenom} {obj.artiste.nom}"

@@ -6,7 +6,7 @@ from .utils.spotify import generate_playlist_for_gallery, search_playlists_by_th
 from rest_framework.permissions import IsAuthenticatedOrReadOnly
 from rest_framework import viewsets
 from .models import Utilisateur, Oeuvre, Galerie, Interaction, Statistique, GalerieInvitation, SavedStat, Suivi
-from .serializers import UtilisateurSerializer, OeuvreSerializer, GalerieSerializer, InteractionSerializer, StatistiqueSerializer, GalerieInvitationSerializer, SavedStatSerializer, SuiviSerializer
+from .serializers import UtilisateurSerializer, OeuvreSerializer, GalerieSerializer, InteractionSerializer, StatistiqueSerializer, GalerieInvitationSerializer, SavedStatSerializer, SuiviSerializer, InteractionCreateSerializer
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from rest_framework import status 
@@ -108,6 +108,16 @@ def generate_ai_text(prompt, max_tokens=250, temperature=0.7, stop=None):
         pass
     return None
 
+from .utils.score_artiste import calculer_score_artiste, calculer_suggestions_amelioration
+from rest_framework import viewsets, status
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated, AllowAny
+from django.core.mail import send_mail
+from django.conf import settings
+from .models import ConsultationOeuvre, PartageOeuvre, ContactArtiste, Utilisateur
+from .serializers import ConsultationOeuvreSerializer, PartageOeuvreSerializer, ContactArtisteSerializer
+from .utils.recommendations_oeuvres import get_recommendations_for_user
 
 class IsAdmin(permissions.BasePermission):
     def has_permission(self, request, view):
@@ -506,6 +516,141 @@ class UtilisateurViewSet(viewsets.ModelViewSet):
             'count': len(artistes_data),
             'artistes': artistes_data
         })
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
+    def mon_score_artiste(self, request):
+        """
+        Calculer et retourner le score artiste de l'utilisateur connecté
+        GET /api/utilisateurs/mon_score_artiste/
+        """
+        try:
+            user = request.user
+            
+            # Calculer le score
+            score_data = calculer_score_artiste(user)
+            
+            # Mettre à jour le score dans la base
+            user.score_artiste = score_data['score']
+            user.score_artiste_updated = timezone.now()
+            user.save(update_fields=['score_artiste', 'score_artiste_updated'])
+            
+            # Calculer les suggestions
+            suggestions = calculer_suggestions_amelioration(user, score_data)
+            
+            return Response({
+                'score': score_data['score'],
+                'categorie': score_data['categorie'],
+                'badge': score_data['badge'],
+                'details': score_data['details'],
+                'suggestions': suggestions,
+                'message': self._get_message_by_score(score_data['score'])
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            print(f"❌ Erreur calcul score: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return Response(
+                {'error': f'Erreur lors du calcul du score: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    def _get_message_by_score(self, score):
+        """Messages personnalisés selon le score"""
+        if score >= 80:
+            return "🌟 Excellent ! Vous avez le profil d'un artiste. Pourquoi ne pas franchir le pas ?"
+        elif score >= 60:
+            return "🎨 Vous êtes sur la bonne voie ! Continuez à explorer et vous pourrez devenir artiste."
+        elif score >= 40:
+            return "💡 Vous montrez de l'intérêt pour l'art. Explorez davantage pour progresser !"
+        else:
+            return "👤 Bienvenue ! Prenez le temps de découvrir nos artistes et la communauté."
+    
+    @action(detail=False, methods=['post'], permission_classes=[IsAdmin])
+    def recalculer_tous_scores(self, request):
+        """
+        Recalculer les scores de tous les utilisateurs (admin only)
+        POST /api/utilisateurs/recalculer_tous_scores/
+        """
+        try:
+            users = Utilisateur.objects.filter(role='user')
+            updated_count = 0
+            
+            for user in users:
+                score_data = calculer_score_artiste(user)
+                user.score_artiste = score_data['score']
+                user.score_artiste_updated = timezone.now()
+                user.save(update_fields=['score_artiste', 'score_artiste_updated'])
+                updated_count += 1
+            
+            return Response({
+                'message': f'{updated_count} utilisateurs mis à jour',
+                'count': updated_count
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    @action(detail=False, methods=['get'], permission_classes=[IsAdmin])
+    def dashboard_artiste_potential(self, request):
+        """
+        Dashboard admin : Liste des utilisateurs avec potentiel artiste
+        GET /api/utilisateurs/dashboard_artiste_potential/
+        """
+        try:
+            # Récupérer tous les users avec leur score
+            users = Utilisateur.objects.filter(role='user').order_by('-score_artiste')
+            
+            # Catégoriser
+            tres_probables = []
+            probables = []
+            potentiels = []
+            
+            for user in users:
+                # Recalculer si score ancien (>7 jours) ou jamais calculé
+                if not user.score_artiste_updated or \
+                   (timezone.now() - user.score_artiste_updated).days > 7:
+                    score_data = calculer_score_artiste(user)
+                    user.score_artiste = score_data['score']
+                    user.score_artiste_updated = timezone.now()
+                    user.save(update_fields=['score_artiste', 'score_artiste_updated'])
+                
+                user_info = {
+                    'id': user.id,
+                    'nom': f"{user.prenom} {user.nom}",
+                    'email': user.email,
+                    'score': user.score_artiste,
+                    'date_inscription': user.date_inscription,
+                    'artistes_suivis': Suivi.objects.filter(utilisateur=user).count()
+                }
+                
+                if user.score_artiste >= 80:
+                    tres_probables.append(user_info)
+                elif user.score_artiste >= 60:
+                    probables.append(user_info)
+                elif user.score_artiste >= 40:
+                    potentiels.append(user_info)
+            
+            return Response({
+                'statistiques': {
+                    'tres_probables': len(tres_probables),
+                    'probables': len(probables),
+                    'potentiels': len(potentiels),
+                    'total': users.count()
+                },
+                'tres_probables': tres_probables[:10],  # Top 10
+                'probables': probables[:10],
+                'potentiels': potentiels[:10]
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            print(f"❌ Erreur dashboard: {str(e)}")
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
          
 class OeuvreViewSet(viewsets.ModelViewSet):
     queryset = Oeuvre.objects.all()
@@ -759,6 +904,61 @@ class OeuvreViewSet(viewsets.ModelViewSet):
                 {'error': f'Erreur lors de la génération: {str(e)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
+    def recommendations(self, request):
+        """
+        Obtenir des recommandations personnalisées d'œuvres
+        GET /api/oeuvres/recommendations/
+        GET /api/oeuvres/recommendations/?limit=20
+        """
+        limit = int(request.query_params.get('limit', 12))
+        
+        try:
+            # Générer les recommandations
+            recommendations = get_recommendations_for_user(
+                user=request.user,
+                limit=limit
+            )
+            
+            # Préparer la réponse
+            results = []
+            for rec in recommendations:
+                oeuvre = rec['oeuvre']
+                serializer = self.get_serializer(oeuvre, context={'request': request})
+                oeuvre_data = serializer.data
+                oeuvre_data['recommendation_score'] = rec['score']
+                
+                # Ajouter la raison de la recommandation
+                oeuvre_data['recommendation_reason'] = self._get_recommendation_reason(rec['score'])
+                
+                results.append(oeuvre_data)
+            
+            return Response({
+                'count': len(results),
+                'algorithm': 'hybrid_collaborative_filtering',
+                'recommendations': results,
+                'message': 'Recommandations basées sur vos likes, commentaires et artistes suivis'
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            print(f"❌ Erreur recommandations: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return Response(
+                {'error': f'Erreur lors de la génération des recommandations: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    def _get_recommendation_reason(self, score):
+        """Génère une raison basée sur le score"""
+        if score >= 5:
+            return "Fortement recommandé pour vous"
+        elif score >= 3:
+            return "Correspond à vos goûts"
+        elif score >= 1.5:
+            return "Pourrait vous plaire"
+        else:
+            return "À découvrir"
 
 class GalerieViewSet(viewsets.ModelViewSet):
     queryset = Galerie.objects.all()
@@ -1237,6 +1437,360 @@ L'équipe Pixelette
 class InteractionViewSet(viewsets.ModelViewSet):
     queryset = Interaction.objects.all()
     serializer_class = InteractionSerializer
+    permission_classes = [IsAuthenticated]  # Changé pour exiger l'authentification
+    
+    def get_permissions(self):
+        """Permissions selon l'action"""
+        if self.action in ['list', 'retrieve', 'stats_by_oeuvre', 'statistics']:
+            # Lecture libre pour les statistiques
+            permission_classes = [AllowAny]
+        elif self.action in ['create', 'toggle_like']:
+            # Pour l'instant, permettre la création sans authentification pour débugger
+            permission_classes = [AllowAny]
+        else:
+            # Authentification requise pour modifier/supprimer
+            permission_classes = [IsAuthenticated]
+        return [permission() for permission in permission_classes]
+    
+    def get_serializer_class(self):
+        if self.action in ['create', 'update', 'partial_update']:
+            return InteractionCreateSerializer
+        return InteractionSerializer
+    
+    def get_queryset(self):
+        queryset = Interaction.objects.select_related('utilisateur', 'oeuvre').order_by('-date')
+        
+        # Filtres pour le backoffice
+        type_filter = self.request.query_params.get('type')
+        utilisateur_filter = self.request.query_params.get('utilisateur')
+        oeuvre_filter = self.request.query_params.get('oeuvre')
+        date_from = self.request.query_params.get('date_from')
+        date_to = self.request.query_params.get('date_to')
+        
+        if type_filter:
+            queryset = queryset.filter(type=type_filter)
+        if utilisateur_filter:
+            queryset = queryset.filter(utilisateur_id=utilisateur_filter)
+        if oeuvre_filter:
+            queryset = queryset.filter(oeuvre_id=oeuvre_filter)
+        if date_from:
+            queryset = queryset.filter(date__gte=date_from)
+        if date_to:
+            queryset = queryset.filter(date__lte=date_to)
+            
+        return queryset
+    
+    @action(detail=False, methods=['get'])
+    def statistics(self, request):
+        """Statistiques des interactions pour le backoffice"""
+        from django.db.models import Count
+        
+        total_interactions = Interaction.objects.count()
+        by_type = Interaction.objects.values('type').annotate(count=Count('id'))
+        recent_interactions = Interaction.objects.filter(
+            date__gte=timezone.now() - timedelta(days=7)
+        ).count()
+        
+        top_oeuvres = Interaction.objects.values('oeuvre__titre').annotate(
+            count=Count('id')
+        ).order_by('-count')[:5]
+        
+        top_users = Interaction.objects.values(
+            'utilisateur__prenom', 'utilisateur__nom'
+        ).annotate(count=Count('id')).order_by('-count')[:5]
+        
+        return Response({
+            'total_interactions': total_interactions,
+            'recent_interactions_7_days': recent_interactions,
+            'by_type': list(by_type),
+            'top_oeuvres': list(top_oeuvres),
+            'top_users': list(top_users)
+        })
+    
+    @action(detail=False, methods=['delete'])
+    def bulk_delete(self, request):
+        """Suppression en lot pour le backoffice"""
+        ids = request.data.get('ids', [])
+        if not ids:
+            return Response({'error': 'Aucun ID fourni'}, status=400)
+        
+        deleted_count = Interaction.objects.filter(id__in=ids).delete()[0]
+        return Response({
+            'message': f'{deleted_count} interactions supprimées',
+            'deleted_count': deleted_count
+        })
+    
+    def perform_create(self, serializer):
+        # Pour les tests sans authentification
+        serializer.save()
+    
+    def destroy(self, request, *args, **kwargs):
+        """Suppression avec confirmation"""
+        instance = self.get_object()
+        self.perform_destroy(instance)
+        return Response({
+            'message': 'Interaction supprimée avec succès'
+        }, status=status.HTTP_200_OK)
+    
+    def perform_create(self, serializer):
+        """Automatiquement assigner l'utilisateur connecté lors de la création"""
+        print(f"🔍 perform_create appelé avec request.user: {self.request.user}")
+        print(f"🔍 request.user.is_authenticated: {getattr(self.request.user, 'is_authenticated', 'N/A')}")
+        print(f"🔍 Données du serializer: {serializer.validated_data}")
+        
+        try:
+            # Si l'utilisateur n'est pas authentifié, essayer de trouver l'utilisateur autrement
+            if hasattr(self.request.user, 'is_authenticated') and self.request.user.is_authenticated:
+                user = self.request.user
+                print(f"✅ Utilisateur authentifié trouvé: {user}")
+            else:
+                # Pour débugger : utiliser un utilisateur par défaut (temporaire)
+                from .models import Utilisateur
+                user = Utilisateur.objects.first()  # TEMPORAIRE
+                print(f"⚠️ Utilisateur par défaut utilisé: {user}")
+            
+            serializer.save(utilisateur=user)
+            print("✅ Interaction créée avec succès")
+        except Exception as e:
+            print(f"❌ Erreur lors de la création: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            raise
+    
+    def perform_create(self, serializer):
+        # Automatiquement assigner l'utilisateur connecté
+        serializer.save(utilisateur=self.request.user)
+    
+    @action(detail=False, methods=['post'])
+    def toggle_like(self, request):
+        """Endpoint pour toggler un like (ajouter/supprimer)"""
+        oeuvre_id = request.data.get('oeuvre')
+        if not oeuvre_id:
+            return Response({'error': 'oeuvre_id requis'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            oeuvre = Oeuvre.objects.get(id=oeuvre_id)
+        except Oeuvre.DoesNotExist:
+            return Response({'error': 'Œuvre non trouvée'}, status=status.HTTP_404_NOT_FOUND)
+        
+        # Vérifier si l'utilisateur a déjà liké
+        interaction, created = Interaction.objects.get_or_create(
+            utilisateur=request.user,
+            oeuvre=oeuvre,
+            type='like',
+            defaults={'contenu': '', 'plateforme_partage': ''}
+        )
+        
+        if not created:
+            # Si existe déjà, supprimer (unlike)
+            interaction.delete()
+            return Response({
+                'message': 'Like retiré',
+                'liked': False,
+                'total_likes': oeuvre.interactions.filter(type='like').count()
+            })
+        else:
+            # Nouveau like
+            return Response({
+                'message': 'Like ajouté',
+                'liked': True,
+                'total_likes': oeuvre.interactions.filter(type='like').count()
+            })
+    
+    @action(detail=False, methods=['get'])
+    def stats_by_oeuvre(self, request):
+        """Statistiques d'interactions par œuvre"""
+        oeuvre_id = request.query_params.get('oeuvre')
+        
+        if oeuvre_id:
+            # Stats pour une œuvre spécifique
+            try:
+                oeuvre = Oeuvre.objects.get(id=oeuvre_id)
+                interactions = oeuvre.interactions.all()
+                
+                stats = {
+                    'oeuvre_id': oeuvre.id,
+                    'oeuvre_titre': oeuvre.titre,
+                    'total_likes': interactions.filter(type='like').count(),
+                    'total_commentaires': interactions.filter(type='commentaire').count(),
+                    'total_partages': interactions.filter(type='partage').count(),
+                    'total_interactions': interactions.count(),
+                    'interactions_recentes': InteractionSerializer(
+                        interactions.order_by('-date')[:5], many=True
+                    ).data
+                }
+                return Response(stats)
+            except Oeuvre.DoesNotExist:
+                return Response({'error': 'Œuvre non trouvée'}, status=status.HTTP_404_NOT_FOUND)
+        else:
+            # Stats globales pour toutes les œuvres
+            from django.db.models import Count
+            stats = Oeuvre.objects.annotate(
+                total_likes=Count('interactions', filter=Q(interactions__type='like')),
+                total_commentaires=Count('interactions', filter=Q(interactions__type='commentaire')),
+                total_partages=Count('interactions', filter=Q(interactions__type='partage')),
+                total_interactions=Count('interactions')
+            ).values(
+                'id', 'titre', 'total_likes', 'total_commentaires', 
+                'total_partages', 'total_interactions'
+            )
+            
+            return Response(list(stats))
+    
+    @action(detail=True, methods=['delete'])
+    def delete_my_interaction(self, request, pk=None):
+        """Permettre à l'utilisateur de supprimer ses propres interactions"""
+        try:
+            interaction = self.get_object()
+            if interaction.utilisateur != request.user:
+                return Response(
+                    {'error': 'Vous pouvez seulement supprimer vos propres interactions'}, 
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            interaction.delete()
+            return Response({'message': 'Interaction supprimée'}, status=status.HTTP_200_OK)
+        except Interaction.DoesNotExist:
+            return Response({'error': 'Interaction non trouvée'}, status=status.HTTP_404_NOT_FOUND)
+
+    @action(detail=False, methods=['post'], permission_classes=[AllowAny])  # À changer en IsAuthenticated plus tard
+    def reply_to_comment(self, request):
+        """Créer une réponse à un commentaire"""
+        parent_id = request.data.get('parent')
+        oeuvre_id = request.data.get('oeuvre')
+        contenu = request.data.get('contenu')
+        
+        if not all([parent_id, oeuvre_id, contenu]):
+            return Response({
+                'error': 'parent, oeuvre et contenu sont requis'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            parent_comment = Interaction.objects.get(
+                id=parent_id, 
+                type='commentaire'
+            )
+            oeuvre = Oeuvre.objects.get(id=oeuvre_id)
+            
+            # Créer la réponse
+            reply = Interaction.objects.create(
+                type='commentaire',
+                utilisateur=request.user if hasattr(request.user, 'is_authenticated') and request.user.is_authenticated else Utilisateur.objects.first(),  # Temporaire pour débuggage
+                oeuvre=oeuvre,
+                contenu=contenu.strip(),
+                parent=parent_comment
+            )
+            
+            return Response({
+                'message': 'Réponse ajoutée avec succès',
+                'reply': InteractionSerializer(reply).data
+            }, status=status.HTTP_201_CREATED)
+            
+        except Interaction.DoesNotExist:
+            return Response({
+                'error': 'Commentaire parent non trouvé'
+            }, status=status.HTTP_404_NOT_FOUND)
+        except Oeuvre.DoesNotExist:
+            return Response({
+                'error': 'Œuvre non trouvée'
+            }, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({
+                'error': f'Erreur lors de la création de la réponse: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(detail=False, methods=['get'])
+    def comments_with_replies(self, request):
+        """Récupérer les commentaires avec leurs réponses de manière hiérarchique"""
+        oeuvre_id = request.query_params.get('oeuvre')
+        
+        if not oeuvre_id:
+            return Response({
+                'error': 'oeuvre_id requis'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            oeuvre = Oeuvre.objects.get(id=oeuvre_id)
+            
+            # Récupérer tous les commentaires principaux (sans parent)
+            main_comments = Interaction.objects.filter(
+                oeuvre=oeuvre,
+                type='commentaire',
+                parent__isnull=True
+            ).select_related('utilisateur').prefetch_related(
+                'reponses__utilisateur'
+            ).order_by('-date')
+            
+            # Sérialiser avec les réponses
+            comments_data = []
+            for comment in main_comments:
+                comment_data = InteractionSerializer(comment).data
+                
+                # Ajouter les réponses
+                replies = comment.reponses.all().order_by('date')
+                comment_data['replies'] = InteractionSerializer(replies, many=True).data
+                comment_data['replies_count'] = replies.count()
+                
+                comments_data.append(comment_data)
+            
+            return Response({
+                'comments': comments_data,
+                'total_comments': main_comments.count()
+            })
+            
+        except Oeuvre.DoesNotExist:
+            return Response({
+                'error': 'Œuvre non trouvée'
+            }, status=status.HTTP_404_NOT_FOUND)
+
+    @action(detail=False, methods=['get'])
+    def interaction_details(self, request):
+        """Récupérer les détails des interactions pour les tooltips (incluant les réponses)"""
+        oeuvre_id = request.query_params.get('oeuvre')
+        
+        if not oeuvre_id:
+            return Response({'error': 'oeuvre_id requis'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            oeuvre = Oeuvre.objects.get(id=oeuvre_id)
+            
+            # Likes
+            likes = Interaction.objects.filter(
+                oeuvre=oeuvre, type='like'
+            ).select_related('utilisateur').order_by('-date')[:10]
+            
+            # Commentaires (seulement les commentaires principaux pour les tooltips)
+            commentaires = Interaction.objects.filter(
+                oeuvre=oeuvre, type='commentaire', parent__isnull=True
+            ).select_related('utilisateur').order_by('-date')[:5]
+            
+            # Partages
+            partages = Interaction.objects.filter(
+                oeuvre=oeuvre, type='partage'
+            ).select_related('utilisateur').order_by('-date')[:10]
+            
+            return Response({
+                'likes': [{
+                    'id': like.id,
+                    'utilisateur_nom': f"{like.utilisateur.prenom} {like.utilisateur.nom}",
+                    'date': like.date
+                } for like in likes],
+                'commentaires': [{
+                    'id': comment.id,
+                    'utilisateur_nom': f"{comment.utilisateur.prenom} {comment.utilisateur.nom}",
+                    'contenu': comment.contenu,
+                    'date': comment.date,
+                    'replies_count': comment.reponses.count()
+                } for comment in commentaires],
+                'partages': [{
+                    'id': partage.id,
+                    'utilisateur_nom': f"{partage.utilisateur.prenom} {partage.utilisateur.nom}",
+                    'plateforme_partage': partage.plateforme_partage,
+                    'date': partage.date
+                } for partage in partages]
+            })
+            
+        except Oeuvre.DoesNotExist:
+            return Response({'error': 'Œuvre non trouvée'}, status=status.HTTP_404_NOT_FOUND)
 
 class StatistiqueViewSet(viewsets.ModelViewSet):
     queryset = Statistique.objects.all()
@@ -1602,6 +2156,247 @@ class SuiviViewSet(viewsets.ModelViewSet):
             'abonnes': serializer.data
         })
 
+
+class ConsultationOeuvreViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet pour tracker les consultations d'œuvres
+    """
+    queryset = ConsultationOeuvre.objects.all()
+    serializer_class = ConsultationOeuvreSerializer
+    permission_classes = [AllowAny]  # Permet aussi aux non-connectés
+    
+    def create(self, request, *args, **kwargs):
+        """
+        POST /api/consultations/
+        Body: { "oeuvre_id": 123 }
+        """
+        oeuvre_id = request.data.get('oeuvre_id')
+        
+        if not oeuvre_id:
+            return Response(
+                {'error': 'oeuvre_id requis'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Créer la consultation
+        consultation = ConsultationOeuvre.objects.create(
+            utilisateur=request.user if request.user.is_authenticated else None,
+            oeuvre_id=oeuvre_id
+        )
+        
+        return Response(
+            {'message': 'Consultation enregistrée', 'id': consultation.id},
+            status=status.HTTP_201_CREATED
+        )
+    
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
+    def mes_consultations(self, request):
+        """
+        GET /api/consultations/mes_consultations/
+        Retourne l'historique des consultations de l'utilisateur
+        """
+        consultations = ConsultationOeuvre.objects.filter(
+            utilisateur=request.user
+        ).order_by('-date_consultation')[:50]
+        
+        serializer = self.get_serializer(consultations, many=True)
+        return Response({
+            'count': consultations.count(),
+            'consultations': serializer.data
+        })
+
+
+class PartageOeuvreViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet pour tracker les partages d'œuvres
+    """
+    queryset = PartageOeuvre.objects.all()
+    serializer_class = PartageOeuvreSerializer
+    permission_classes = [IsAuthenticated]
+    
+    def create(self, request, *args, **kwargs):
+        """
+        POST /api/partages/
+        Body: { "oeuvre_id": 123, "plateforme": "facebook" }
+        """
+        oeuvre_id = request.data.get('oeuvre_id')
+        plateforme = request.data.get('plateforme')
+        
+        if not oeuvre_id or not plateforme:
+            return Response(
+                {'error': 'oeuvre_id et plateforme requis'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Vérifier que la plateforme est valide
+        plateformes_valides = ['facebook', 'twitter', 'linkedin', 'whatsapp']
+        if plateforme not in plateformes_valides:
+            return Response(
+                {'error': f'Plateforme invalide. Choix: {plateformes_valides}'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Créer le partage
+        partage = PartageOeuvre.objects.create(
+            utilisateur=request.user,
+            oeuvre_id=oeuvre_id,
+            plateforme=plateforme
+        )
+        
+        return Response(
+            {'message': 'Partage enregistré', 'id': partage.id},
+            status=status.HTTP_201_CREATED
+        )
+    
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
+    def mes_partages(self, request):
+        """
+        GET /api/partages/mes_partages/
+        Retourne l'historique des partages de l'utilisateur
+        """
+        partages = PartageOeuvre.objects.filter(
+            utilisateur=request.user
+        ).order_by('-date_partage')
+        
+        serializer = self.get_serializer(partages, many=True)
+        return Response({
+            'count': partages.count(),
+            'partages': serializer.data
+        })
+
+
+class ContactArtisteViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet pour contacter les artistes
+    """
+    queryset = ContactArtiste.objects.all()
+    serializer_class = ContactArtisteSerializer
+    permission_classes = [IsAuthenticated]
+    
+    def create(self, request, *args, **kwargs):
+        """
+        POST /api/contacts/
+        Body: { 
+            "artiste_id": 5, 
+            "sujet": "Question sur vos œuvres",
+            "message": "Bonjour, ..." 
+        }
+        """
+        artiste_id = request.data.get('artiste_id')
+        sujet = request.data.get('sujet', 'Demande de contact')
+        message_text = request.data.get('message')
+        
+        if not artiste_id or not message_text:
+            return Response(
+                {'error': 'artiste_id et message requis'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Vérifier que l'artiste existe
+        try:
+            artiste = Utilisateur.objects.get(id=artiste_id, role='artiste')
+        except Utilisateur.DoesNotExist:
+            return Response(
+                {'error': 'Artiste non trouvé'}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Empêcher de se contacter soi-même
+        if request.user.id == artiste_id:
+            return Response(
+                {'error': 'Vous ne pouvez pas vous contacter vous-même'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Créer le contact
+        contact = ContactArtiste.objects.create(
+            utilisateur=request.user,
+            artiste=artiste,
+            sujet=sujet,
+            message=message_text
+        )
+        
+        # Envoyer l'email à l'artiste
+        try:
+            email_subject = f"[Pixelette] {sujet} - Message de {request.user.prenom} {request.user.nom}"
+            email_message = f"""
+Bonjour {artiste.prenom},
+
+Vous avez reçu un nouveau message via Pixelette :
+
+De : {request.user.prenom} {request.user.nom} ({request.user.email})
+Sujet : {sujet}
+
+Message :
+{message_text}
+
+---
+Pour répondre, vous pouvez contacter {request.user.email} directement.
+
+Cordialement,
+L'équipe Pixelette
+            """
+            
+            send_mail(
+                email_subject,
+                email_message,
+                settings.DEFAULT_FROM_EMAIL,
+                [artiste.email],
+                fail_silently=False
+            )
+            
+            return Response({
+                'message': 'Message envoyé avec succès !',
+                'contact_id': contact.id
+            }, status=status.HTTP_201_CREATED)
+            
+        except Exception as e:
+            # Si l'email échoue, on garde quand même le contact dans la DB
+            return Response({
+                'message': 'Message enregistré mais email non envoyé',
+                'contact_id': contact.id,
+                'error': str(e)
+            }, status=status.HTTP_201_CREATED)
+    
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
+    def mes_contacts(self, request):
+        """
+        GET /api/contacts/mes_contacts/
+        Retourne les messages envoyés par l'utilisateur
+        """
+        contacts = ContactArtiste.objects.filter(
+            utilisateur=request.user
+        ).order_by('-date_contact')
+        
+        serializer = self.get_serializer(contacts, many=True)
+        return Response({
+            'count': contacts.count(),
+            'contacts': serializer.data
+        })
+    
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
+    def contacts_recus(self, request):
+        """
+        GET /api/contacts/contacts_recus/
+        Retourne les messages reçus (pour les artistes)
+        """
+        if request.user.role != 'artiste':
+            return Response(
+                {'error': 'Réservé aux artistes'}, 
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        contacts = ContactArtiste.objects.filter(
+            artiste=request.user
+        ).order_by('-date_contact')
+        
+        serializer = self.get_serializer(contacts, many=True)
+        return Response({
+            'count': contacts.count(),
+            'non_lus': contacts.filter(lu=False).count(),
+            'contacts': serializer.data
+        })
+    
 # ===== VUES SPOTIFY OAUTH =====
 
 from django.http import JsonResponse, HttpResponseRedirect, FileResponse

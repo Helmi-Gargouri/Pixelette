@@ -85,6 +85,13 @@ const OeuvresList = () => {
     event.preventDefault()
     event.stopPropagation()
     
+    if (platform !== 'copy') {
+    axios.post('http://localhost:8000/api/partages/', { 
+      oeuvre_id: oeuvre.id, 
+      plateforme: platform 
+    }, { withCredentials: true }).catch(() => {})
+   }
+   
     const currentUrl = `${window.location.origin}/oeuvres/${oeuvre.id}`
     const shareTitle = oeuvre.titre
     const shareDescription = oeuvre.description ? oeuvre.description.substring(0, 200) : 'Découvrez cette œuvre sur Pixelette'
@@ -164,7 +171,7 @@ const OeuvresList = () => {
           {/* Barre de recherche et filtres */}
           <div style={{ background: '#F8F7F4', padding: '25px', borderRadius: '15px', marginBottom: '30px' }}>
             <div className="row align-items-center">
-              <div className="col-lg-7 col-md-12 mb-3 mb-lg-0">
+              <div className="col-lg-5 col-md-12 mb-3 mb-lg-0">
                 <div className="input-group" style={{ boxShadow: '0 2px 10px rgba(0,0,0,0.05)' }}>
                   <span className="input-group-text" style={{ 
                     background: '#fff', 
@@ -223,12 +230,18 @@ const OeuvresList = () => {
                   <option value="title"> Titre (A-Z)</option>
                 </select>
               </div>
-              <div className="col-lg-2 col-md-4">
+              <div className="col-lg-2 col-md-6 mb-3 mb-lg-0">
                 {isAuthenticated && (user?.role === 'artiste' || user?.role === 'admin') && (
                   <Link to="/mes-oeuvres" className="btn w-100" style={{ padding: '12px' }}>
                     <i className="fas fa-folder me-2"></i>Mes Oeuvres
                   </Link>
                 )}
+              </div>
+                 <div className="col-lg-2 col-md-6">
+                <Link to="/recommendations" className="btn w-100" style={{ padding: '12px' }}>
+                  <i className="fas fa-lightbulb me-2"></i>Recommendations
+
+                </Link>
               </div>
             </div>
           </div>

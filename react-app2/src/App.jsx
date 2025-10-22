@@ -40,7 +40,7 @@ import GalerieManageOeuvres from './pages/Galeries/GalerieManageOeuvres';
 import MesGaleries from './pages/Galeries/MesGaleries';
 import AcceptInvite from './pages/Galeries/AcceptInvite';
 import ArtistesList from './pages/ArtistesList' 
-
+import Recommendations from './pages/Oeuvres/Recommendations'
 function App() {
   useEffect(() => {
     // Load jQuery and other scripts
@@ -124,7 +124,9 @@ function App() {
             <Route path="/oeuvres/ai-generator" element={<OeuvreAIGenerator />} />
             <Route path="/oeuvres/:id/edit" element={<OeuvreEdit />} />
             <Route path="/mes-oeuvres" element={<MesOeuvres />} />
+            <Route path="/recommendations" element={<Recommendations />} />
 
+            
             {/* Routes Galeries */}
             <Route path="/galeries" element={<GaleriesList />} />
             <Route path="/galeries/create" element={<GalerieCreate />} />

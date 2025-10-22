@@ -22,7 +22,8 @@ from django.conf.urls.static import static
 from .views import (
     UtilisateurViewSet, OeuvreViewSet, GalerieViewSet, InteractionViewSet, 
     StatistiqueViewSet, DemandeRoleViewSet, SavedStatViewSet, spotify_create_playlist, 
-    spotify_auth_url, spotify_callback, whoami, SuiviViewSet 
+    spotify_auth_url, spotify_callback, whoami, SuiviViewSet,
+    ContactArtisteViewSet, ConsultationOeuvreViewSet,PartageOeuvreViewSet
 )
 from .views import users_by_date
 from .views import views_by_artist
@@ -39,6 +40,11 @@ router.register(r'statistiques', StatistiqueViewSet)
 router.register(r'saved-stats', SavedStatViewSet)
 router.register(r'demandes', DemandeRoleViewSet) 
 router.register(r'suivis', SuiviViewSet, basename='suivi') 
+router.register(r'contacts', ContactArtisteViewSet) 
+router.register(r'consultations', ConsultationOeuvreViewSet) 
+router.register(r'partages', PartageOeuvreViewSet) 
+
+
 urlpatterns = [
     path('admin/', admin.site.urls),
     # specific API routes first
