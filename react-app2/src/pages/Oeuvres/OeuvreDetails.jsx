@@ -321,7 +321,41 @@ const OeuvreDetails = () => {
 
     } catch (err) {
       console.error('❌ Erreur lors de l\'ajout de la réponse:', err)
-      // Juste logger l'erreur, pas de popup
+      
+      let modalConfig = {
+        show: true,
+        title: 'Erreur',
+        message: 'Erreur lors de l\'ajout de la réponse',
+        type: 'error'
+      }
+      
+      // Vérifier si c'est une erreur de modération conviviale
+      if (err.response?.status === 400 && err.response?.data?.type === 'moderation_reject') {
+        const moderationError = err.response.data
+        modalConfig = {
+          show: true,
+          title: moderationError.title || '🚫 Réponse non autorisée',
+          message: moderationError.message?.replace('commentaire', 'réponse') || 'Votre réponse ne peut pas être publiée',
+          suggestion: moderationError.suggestion?.replace('commentaire', 'réponse'),
+          filteredPreview: moderationError.filtered_preview,
+          details: moderationError.details,
+          type: 'moderation'
+        }
+      } else if (err.response?.status === 500) {
+        modalConfig.message = 'Erreur serveur. Vérifiez que vous êtes bien connecté.'
+      } else if (err.response?.status === 401) {
+        modalConfig.message = 'Vous devez être connecté pour répondre.'
+      } else if (err.response?.status === 403) {
+        modalConfig.message = 'Vous n\'avez pas l\'autorisation de répondre.'
+      } else if (err.response?.data?.detail) {
+        modalConfig.message = err.response.data.detail
+      } else if (err.response?.data?.error) {
+        modalConfig.message = err.response.data.error
+      } else if (err.message) {
+        modalConfig.message = err.message
+      }
+      
+      setModal(modalConfig)
     } finally {
       setLoadingReply(false)
     }
@@ -424,28 +458,40 @@ const OeuvreDetails = () => {
     } catch (err) {
       console.error('Erreur lors de l\'ajout du commentaire:', err)
       
-      let errorMessage = 'Erreur lors de l\'ajout du commentaire'
-      
-      if (err.response?.status === 500) {
-        errorMessage = 'Erreur serveur. Vérifiez que vous êtes bien connecté.'
-      } else if (err.response?.status === 401) {
-        errorMessage = 'Vous devez être connecté pour commenter.'
-      } else if (err.response?.status === 403) {
-        errorMessage = 'Vous n\'avez pas l\'autorisation de commenter.'
-      } else if (err.response?.data?.detail) {
-        errorMessage = err.response.data.detail
-      } else if (err.response?.data?.error) {
-        errorMessage = err.response.data.error
-      } else if (err.message) {
-        errorMessage = err.message
-      }
-      
-      setModal({
+      let modalConfig = {
         show: true,
         title: 'Erreur',
-        message: errorMessage,
+        message: 'Erreur lors de l\'ajout du commentaire',
         type: 'error'
-      })
+      }
+      
+      // Vérifier si c'est une erreur de modération conviviale
+      if (err.response?.status === 400 && err.response?.data?.type === 'moderation_reject') {
+        const moderationError = err.response.data
+        modalConfig = {
+          show: true,
+          title: moderationError.title || '🚫 Commentaire non autorisé',
+          message: moderationError.message || 'Votre commentaire ne peut pas être publié',
+          suggestion: moderationError.suggestion,
+          filteredPreview: moderationError.filtered_preview,
+          details: moderationError.details,
+          type: 'moderation'
+        }
+      } else if (err.response?.status === 500) {
+        modalConfig.message = 'Erreur serveur. Vérifiez que vous êtes bien connecté.'
+      } else if (err.response?.status === 401) {
+        modalConfig.message = 'Vous devez être connecté pour commenter.'
+      } else if (err.response?.status === 403) {
+        modalConfig.message = 'Vous n\'avez pas l\'autorisation de commenter.'
+      } else if (err.response?.data?.detail) {
+        modalConfig.message = err.response.data.detail
+      } else if (err.response?.data?.error) {
+        modalConfig.message = err.response.data.error
+      } else if (err.message) {
+        modalConfig.message = err.message
+      }
+      
+      setModal(modalConfig)
       setLoadingInteractions(prev => ({ ...prev, comment: false }))
     }
   }

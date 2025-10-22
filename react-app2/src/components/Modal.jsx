@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { createPortal } from 'react-dom'
 
-const Modal = ({ show, onClose, title, message, type = 'success' }) => {
+const Modal = ({ show, onClose, title, message, type = 'success', suggestion, filteredPreview, details }) => {
   useEffect(() => {
     if (show) {
       document.body.style.overflow = 'hidden'
@@ -23,6 +23,8 @@ const Modal = ({ show, onClose, title, message, type = 'success' }) => {
         return <i className="fas fa-times-circle" style={{ fontSize: '3rem', color: '#dc3545' }}></i>
       case 'warning':
         return <i className="fas fa-exclamation-triangle" style={{ fontSize: '3rem', color: '#ffc107' }}></i>
+      case 'moderation':
+        return <i className="fas fa-shield-alt" style={{ fontSize: '3rem', color: '#ff6b35' }}></i>
       default:
         return <i className="fas fa-check-circle" style={{ fontSize: '3rem', color: '#28a745' }}></i>
     }
@@ -65,6 +67,53 @@ const Modal = ({ show, onClose, title, message, type = 'success' }) => {
         </div>
         <h3 style={{ marginBottom: '10px', fontSize: '1.5rem' }}>{title}</h3>
         <p style={{ color: '#666', marginBottom: '25px' }}>{message}</p>
+        
+        {/* Contenu spécialisé pour la modération */}
+        {type === 'moderation' && (
+          <div style={{ marginBottom: '20px', textAlign: 'left' }}>
+            {suggestion && (
+              <div style={{ 
+                background: '#e8f5e8', 
+                padding: '15px', 
+                borderRadius: '8px', 
+                marginBottom: '15px',
+                border: '1px solid #d1ecf1'
+              }}>
+                <strong style={{ color: '#0c5460' }}>{suggestion}</strong>
+              </div>
+            )}
+            
+            {filteredPreview && (
+              <div style={{ marginBottom: '15px' }}>
+                <strong>🔍 Aperçu filtré :</strong>
+                <div style={{ 
+                  background: '#f8f9fa', 
+                  padding: '10px', 
+                  borderRadius: '5px',
+                  fontFamily: 'monospace',
+                  marginTop: '5px'
+                }}>
+                  "{filteredPreview}"
+                </div>
+              </div>
+            )}
+            
+            {details && (
+              <div style={{ fontSize: '0.9rem', color: '#666' }}>
+                <strong>📊 Détails :</strong>
+                <ul style={{ textAlign: 'left', marginTop: '5px', paddingLeft: '20px' }}>
+                  {details.score && (
+                    <li>Score de confiance : {(details.score * 100).toFixed(1)}%</li>
+                  )}
+                  {details.detected_issues && details.detected_issues.length > 0 && (
+                    <li>Problèmes détectés : {details.detected_issues.join(', ')}</li>
+                  )}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
+        
         <button 
           onClick={onClose}
           className="btn"
