@@ -26,7 +26,7 @@ SECRET_KEY = 'django-insecure-8em6!+87nl6eje_8bb%*t-481r#-%1+y#e6&xaj%tm7$er_hqj
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', 'testserver']
 
 
 # Application definition
@@ -201,3 +201,6 @@ SPOTIFY_REDIRECT_URI = config('SPOTIFY_REDIRECT_URI', default='http://127.0.0.1:
 
 # Optional Google/Gemini API key (from .env as GEMINI_API_KEY_USER_1)
 GEMINI_API_KEY_USER_1 = config('GEMINI_API_KEY_USER_1', default='')
+# OpenAI API Configuration
+OPENAI_API_KEY = config('OPENAI_API_KEY', default='')
+OPENAI_MODEL = config('OPENAI_MODEL', default='gpt-3.5-turbo')

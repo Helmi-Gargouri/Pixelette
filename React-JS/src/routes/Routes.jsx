@@ -40,6 +40,7 @@ const InvoiceOverview = lazy(() => import('@/app/(admin)/(app)/(invoice)/overvie
 // Pixelette - Œuvres et Galeries
 const OeuvreGrid = lazy(() => import('@/app/(admin)/(app)/oeuvres-grid'));
 const GalerieList = lazy(() => import('@/app/(admin)/(app)/galeries-list'));
+const GestionInteractions = lazy(() => import('@/app/(admin)/(app)/gestion-interactions'));
 
 // Pixelette -Auth
 const AdminLogin = lazy(() => import('@/app/(auth)/admin-login'));
@@ -257,6 +258,10 @@ export const layoutsRoutes = [{
   path: '/galeries-list',
   name: 'GalerieList',
   element: <GalerieList />
+}, {
+  path: '/gestion-interactions',
+  name: 'GestionInteractions',
+  element: <GestionInteractions />
 }, {
   path: '/calendar',
   name: 'Calender',

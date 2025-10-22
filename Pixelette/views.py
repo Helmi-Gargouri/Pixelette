@@ -1,8 +1,11 @@
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.exceptions import ValidationError
 from .utils.color_analysis import analyze_galerie_palette
 from .utils.clustering import cluster_galeries
 from .utils.spotify import generate_playlist_for_gallery, search_playlists_by_theme, get_spotify_oauth, create_playlist_in_user_account
+from .utils.content_moderation import moderate_text, filter_bad_words
+from .utils.ai_comment_generator import generate_ai_comment, generate_multiple_ai_comments
 from rest_framework.permissions import IsAuthenticatedOrReadOnly
 from rest_framework import viewsets
 from .models import Utilisateur, Oeuvre, Galerie, Interaction, Statistique, GalerieInvitation, SavedStat, Suivi
@@ -20,6 +23,8 @@ from django.utils import timezone
 from rest_framework.authtoken.models import Token
 from django.contrib.auth import login  
 from rest_framework.authtoken.models import Token
+from django.db import models
+from django.db.models import Count, Q
 from django.core.cache import cache 
 from rest_framework.decorators import action 
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
@@ -50,6 +55,9 @@ import requests
 import io
 from PIL import Image
 from django.db.models import F
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 # AI helper: try OpenAI first, then fallback to Google Generative (Gemini) if configured.
@@ -960,6 +968,91 @@ class OeuvreViewSet(viewsets.ModelViewSet):
         else:
             return "À découvrir"
 
+    @action(detail=True, methods=['post'], permission_classes=[AllowAny])
+    def generate_ai_comment(self, request, pk=None):
+        """Générer un commentaire IA intelligent basé sur l'œuvre"""
+        try:
+            # Récupérer l'œuvre
+            oeuvre = self.get_object()
+            
+            # Préparer les données pour l'IA
+            oeuvre_data = {
+                'titre': oeuvre.titre,
+                'description': oeuvre.description or '',
+                'technique': '',  # Pas de champ technique dans le modèle
+                'dimension': '',  # Pas de champ dimension dans le modèle
+                'auteur_nom': oeuvre.auteur.nom if hasattr(oeuvre.auteur, 'nom') else str(oeuvre.auteur),
+                'date_creation': str(oeuvre.date_creation.year) if oeuvre.date_creation else ''
+            }
+            
+            # Générer le commentaire avec l'IA
+            ai_result = generate_ai_comment(oeuvre_data)
+            
+            if ai_result['success']:
+                return Response({
+                    'success': True,
+                    'comment': ai_result['comment'],
+                    'style': ai_result['style'],
+                    'confidence': ai_result['confidence'],
+                    'metadata': ai_result['metadata'],
+                    'message': f'Commentaire IA généré avec style "{ai_result["style"]}"'
+                })
+            else:
+                return Response({
+                    'success': False,
+                    'error': ai_result['error']
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                
+        except Exception as e:
+            logger.error(f"Erreur génération commentaire IA: {e}")
+            return Response({
+                'success': False,
+                'error': f'Erreur interne: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(detail=True, methods=['post'], permission_classes=[AllowAny])
+    def generate_multiple_ai_comments(self, request, pk=None):
+        """Générer plusieurs suggestions de commentaires IA avec différents styles"""
+        try:
+            oeuvre = self.get_object()
+            count = int(request.data.get('count', 3))  # Par défaut 3 suggestions
+            
+            if count > 5:  # Limite pour éviter les abus
+                count = 5
+            
+            # Préparer les données
+            oeuvre_data = {
+                'titre': oeuvre.titre,
+                'description': oeuvre.description or '',
+                'technique': '',  # Pas de champ technique dans le modèle
+                'dimension': '',  # Pas de champ dimension dans le modèle
+                'auteur_nom': oeuvre.auteur.nom if hasattr(oeuvre.auteur, 'nom') else str(oeuvre.auteur),
+                'date_creation': str(oeuvre.date_creation.year) if oeuvre.date_creation else ''
+            }
+            
+            # Générer plusieurs suggestions
+            suggestions = generate_multiple_ai_comments(oeuvre_data, count)
+            
+            if suggestions:
+                return Response({
+                    'success': True,
+                    'suggestions': suggestions,
+                    'count': len(suggestions),
+                    'message': f'{len(suggestions)} suggestions générées'
+                })
+            else:
+                return Response({
+                    'success': False,
+                    'error': 'Aucune suggestion générée'
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                
+        except Exception as e:
+            logger.error(f"Erreur génération suggestions IA: {e}")
+            return Response({
+                'success': False,
+                'error': f'Erreur interne: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 class GalerieViewSet(viewsets.ModelViewSet):
     queryset = Galerie.objects.all()
     serializer_class = GalerieSerializer
@@ -1460,12 +1553,24 @@ class InteractionViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         queryset = Interaction.objects.select_related('utilisateur', 'oeuvre').order_by('-date')
         
+        # Pour les admins, montrer toutes les interactions
+        if (hasattr(self.request.user, 'role') and self.request.user.role == 'admin') or self.request.query_params.get('admin_view'):
+            # Vue administrative - toutes les interactions
+            pass
+        else:
+            # Vue publique - seulement les interactions visibles
+            queryset = queryset.filter(
+                Q(moderation_status__in=['approved', 'pending']) & 
+                Q(moderation_score__lt=0.8)
+            )
+        
         # Filtres pour le backoffice
         type_filter = self.request.query_params.get('type')
         utilisateur_filter = self.request.query_params.get('utilisateur')
         oeuvre_filter = self.request.query_params.get('oeuvre')
         date_from = self.request.query_params.get('date_from')
         date_to = self.request.query_params.get('date_to')
+        moderation_status = self.request.query_params.get('moderation_status')
         
         if type_filter:
             queryset = queryset.filter(type=type_filter)
@@ -1477,6 +1582,8 @@ class InteractionViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(date__gte=date_from)
         if date_to:
             queryset = queryset.filter(date__lte=date_to)
+        if moderation_status:
+            queryset = queryset.filter(moderation_status=moderation_status)
             
         return queryset
     
@@ -1520,9 +1627,202 @@ class InteractionViewSet(viewsets.ModelViewSet):
             'deleted_count': deleted_count
         })
     
-    def perform_create(self, serializer):
-        # Pour les tests sans authentification
-        serializer.save()
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
+    def moderation_queue(self, request):
+        """Récupérer la file d'attente de modération pour les admins"""
+        # Vérifier que l'utilisateur est admin
+        if not hasattr(request.user, 'role') or request.user.role != 'admin':
+            return Response({'error': 'Accès réservé aux administrateurs'}, status=status.HTTP_403_FORBIDDEN)
+        
+        # Filtrer par statut de modération
+        status_filter = request.query_params.get('status', 'flagged')
+        
+        flagged_interactions = Interaction.objects.filter(
+            moderation_status=status_filter
+        ).select_related('utilisateur', 'oeuvre').order_by('-date')
+        
+        # Pagination
+        page = int(request.query_params.get('page', 1))
+        page_size = int(request.query_params.get('page_size', 20))
+        start = (page - 1) * page_size
+        end = start + page_size
+        
+        total_count = flagged_interactions.count()
+        interactions = flagged_interactions[start:end]
+        
+        # Sérialiser avec détails de modération
+        serialized_data = []
+        for interaction in interactions:
+            data = InteractionSerializer(interaction).data
+            data.update({
+                'moderation_score': interaction.moderation_score,
+                'moderation_status': interaction.moderation_status,
+                'moderation_reasons': interaction.moderation_reasons,
+                'moderation_details': interaction.moderation_details,
+                'filtered_content': interaction.filtered_content,
+                'original_content': interaction.contenu
+            })
+            serialized_data.append(data)
+        
+        return Response({
+            'interactions': serialized_data,
+            'pagination': {
+                'page': page,
+                'page_size': page_size,
+                'total_count': total_count,
+                'total_pages': (total_count + page_size - 1) // page_size
+            },
+            'stats': {
+                'flagged': Interaction.objects.filter(moderation_status='flagged').count(),
+                'pending': Interaction.objects.filter(moderation_status='pending').count(),
+                'rejected': Interaction.objects.filter(moderation_status='rejected').count(),
+                'approved': Interaction.objects.filter(moderation_status='approved').count(),
+            }
+        })
+    
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
+    def approve_content(self, request, pk=None):
+        """Approuver un contenu flaggé"""
+        if not hasattr(request.user, 'role') or request.user.role != 'admin':
+            return Response({'error': 'Accès réservé aux administrateurs'}, status=status.HTTP_403_FORBIDDEN)
+        
+        try:
+            interaction = self.get_object()
+            interaction.moderation_status = 'approved'
+            interaction.reviewed_by = request.user
+            interaction.reviewed_at = timezone.now()
+            interaction.save()
+            
+            return Response({
+                'message': 'Contenu approuvé avec succès',
+                'interaction': InteractionSerializer(interaction).data
+            })
+        except Interaction.DoesNotExist:
+            return Response({'error': 'Interaction non trouvée'}, status=status.HTTP_404_NOT_FOUND)
+    
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
+    def reject_content(self, request, pk=None):
+        """Rejeter un contenu flaggé"""
+        if not hasattr(request.user, 'role') or request.user.role != 'admin':
+            return Response({'error': 'Accès réservé aux administrateurs'}, status=status.HTTP_403_FORBIDDEN)
+        
+        try:
+            interaction = self.get_object()
+            admin_reason = request.data.get('reason', '')
+            
+            interaction.moderation_status = 'rejected'
+            interaction.reviewed_by = request.user
+            interaction.reviewed_at = timezone.now()
+            
+            if admin_reason:
+                existing_reasons = interaction.moderation_reasons or ''
+                interaction.moderation_reasons = f"{existing_reasons}; Admin: {admin_reason}".strip('; ')
+            
+            interaction.save()
+            
+            return Response({
+                'message': 'Contenu rejeté avec succès',
+                'interaction': InteractionSerializer(interaction).data
+            })
+        except Interaction.DoesNotExist:
+            return Response({'error': 'Interaction non trouvée'}, status=status.HTTP_404_NOT_FOUND)
+    
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
+    def bulk_moderation(self, request):
+        """Actions en lot pour la modération"""
+        if not hasattr(request.user, 'role') or request.user.role != 'admin':
+            return Response({'error': 'Accès réservé aux administrateurs'}, status=status.HTTP_403_FORBIDDEN)
+        
+        ids = request.data.get('ids', [])
+        action = request.data.get('action')  # 'approve' ou 'reject'
+        reason = request.data.get('reason', '')
+        
+        if not ids or not action:
+            return Response({'error': 'IDs et action requis'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        if action not in ['approve', 'reject']:
+            return Response({'error': 'Action doit être approve ou reject'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Mise à jour en lot
+        interactions = Interaction.objects.filter(id__in=ids)
+        update_data = {
+            'moderation_status': 'approved' if action == 'approve' else 'rejected',
+            'reviewed_by': request.user,
+            'reviewed_at': timezone.now()
+        }
+        
+        if action == 'reject' and reason:
+            # Pour le rejet en lot, on ajoute la raison admin
+            for interaction in interactions:
+                existing_reasons = interaction.moderation_reasons or ''
+                interaction.moderation_reasons = f"{existing_reasons}; Admin: {reason}".strip('; ')
+                interaction.moderation_status = 'rejected'
+                interaction.reviewed_by = request.user
+                interaction.reviewed_at = timezone.now()
+                interaction.save()
+        else:
+            interactions.update(**update_data)
+        
+        count = interactions.count()
+        action_text = 'approuvées' if action == 'approve' else 'rejetées'
+        
+        return Response({
+            'message': f'{count} interactions {action_text}',
+            'count': count
+        })
+    
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
+    def moderation_stats(self, request):
+        """Statistiques de modération pour le dashboard admin"""
+        if not hasattr(request.user, 'role') or request.user.role != 'admin':
+            return Response({'error': 'Accès réservé aux administrateurs'}, status=status.HTTP_403_FORBIDDEN)
+        
+        from django.db.models import Avg, Count
+        from datetime import timedelta
+        
+        now = timezone.now()
+        week_ago = now - timedelta(days=7)
+        month_ago = now - timedelta(days=30)
+        
+        stats = {
+            'total_interactions': Interaction.objects.count(),
+            'by_status': {
+                'pending': Interaction.objects.filter(moderation_status='pending').count(),
+                'approved': Interaction.objects.filter(moderation_status='approved').count(),
+                'flagged': Interaction.objects.filter(moderation_status='flagged').count(),
+                'rejected': Interaction.objects.filter(moderation_status='rejected').count(),
+            },
+            'this_week': {
+                'total': Interaction.objects.filter(date__gte=week_ago).count(),
+                'flagged': Interaction.objects.filter(date__gte=week_ago, moderation_status='flagged').count(),
+                'rejected': Interaction.objects.filter(date__gte=week_ago, moderation_status='rejected').count(),
+            },
+            'this_month': {
+                'total': Interaction.objects.filter(date__gte=month_ago).count(),
+                'flagged': Interaction.objects.filter(date__gte=month_ago, moderation_status='flagged').count(),
+                'rejected': Interaction.objects.filter(date__gte=month_ago, moderation_status='rejected').count(),
+            },
+            'avg_moderation_score': Interaction.objects.aggregate(
+                avg_score=Avg('moderation_score')
+            )['avg_score'] or 0,
+            'high_risk_interactions': Interaction.objects.filter(
+                moderation_score__gte=0.7
+            ).count(),
+        }
+        
+        return Response(stats)
+    
+    def create(self, request, *args, **kwargs):
+        """Créer une nouvelle interaction avec gestion des erreurs de modération"""
+        try:
+            return super().create(request, *args, **kwargs)
+        except ValidationError as e:
+            # Si c'est une erreur de modération avec notre format spécial
+            if isinstance(e.detail, dict) and e.detail.get('type') == 'moderation_reject':
+                return Response(e.detail, status=status.HTTP_400_BAD_REQUEST)
+            else:
+                # Autres erreurs de validation
+                raise e
     
     def destroy(self, request, *args, **kwargs):
         """Suppression avec confirmation"""
@@ -1533,33 +1833,95 @@ class InteractionViewSet(viewsets.ModelViewSet):
         }, status=status.HTTP_200_OK)
     
     def perform_create(self, serializer):
-        """Automatiquement assigner l'utilisateur connecté lors de la création"""
+        """Automatiquement assigner l'utilisateur connecté lors de la création avec modération IA"""
         print(f"🔍 perform_create appelé avec request.user: {self.request.user}")
         print(f"🔍 request.user.is_authenticated: {getattr(self.request.user, 'is_authenticated', 'N/A')}")
         print(f"🔍 Données du serializer: {serializer.validated_data}")
         
         try:
-            # Si l'utilisateur n'est pas authentifié, essayer de trouver l'utilisateur autrement
+            # Vérifier si l'utilisateur est authentifié
             if hasattr(self.request.user, 'is_authenticated') and self.request.user.is_authenticated:
                 user = self.request.user
                 print(f"✅ Utilisateur authentifié trouvé: {user}")
             else:
                 # Pour débugger : utiliser un utilisateur par défaut (temporaire)
                 from .models import Utilisateur
-                user = Utilisateur.objects.first()  # TEMPORAIRE
+                user = Utilisateur.objects.first()  # TEMPORAIRE - à supprimer en production
                 print(f"⚠️ Utilisateur par défaut utilisé: {user}")
             
-            serializer.save(utilisateur=user)
-            print("✅ Interaction créée avec succès")
+            # Appliquer la modération IA pour les commentaires
+            interaction_data = serializer.validated_data
+            interaction_type = interaction_data.get('type')
+            contenu = interaction_data.get('contenu', '')
+            
+            moderation_data = {}
+            if interaction_type == 'commentaire' and contenu.strip():
+                print(f"🤖 Analyse IA du commentaire: '{contenu[:50]}...'")
+                
+                # Modération avec IA
+                moderation_result = moderate_text(contenu, context='comment')
+                print(f"🤖 Résultat modération: {moderation_result}")
+                
+                # Rejeter automatiquement si score trop élevé
+                if moderation_result['action'] == 'reject':
+                    # Créer une réponse d'erreur conviviale pour l'utilisateur
+                    bad_words_found = moderation_result.get('details', {}).get('bad_words', {}).get('bad_words_found', [])
+                    
+                    if bad_words_found:
+                        user_message = "⚠️ Votre commentaire contient des mots inappropriés et ne peut pas être publié. Veuillez reformuler votre message de manière respectueuse."
+                        suggestion = f"💡 Suggestion : Essayez de remplacer les mots problématiques par des alternatives plus appropriées."
+                    else:
+                        user_message = "⚠️ Votre commentaire ne respecte pas nos règles de communauté et ne peut pas être publié."
+                        suggestion = "💡 Suggestion : Reformulez votre message de manière plus constructive et respectueuse."
+                    
+                    # Lever une exception spéciale que nous catcherons dans create()
+                    from rest_framework.exceptions import ValidationError
+                    error_response_data = {
+                        'error': True,
+                        'type': 'moderation_reject',
+                        'title': '🚫 Commentaire non autorisé',
+                        'message': user_message,
+                        'suggestion': suggestion,
+                        'filtered_preview': filter_bad_words(contenu) if bad_words_found else None,
+                        'details': {
+                            'score': moderation_result['confidence'],
+                            'detected_issues': bad_words_found if bad_words_found else ['Contenu inapproprié']
+                        }
+                    }
+                    raise ValidationError(error_response_data)
+                
+                # Préparer les données de modération pour interactions acceptées
+                moderation_data = {
+                    'moderation_status': self._get_moderation_status(moderation_result['action']),
+                    'moderation_score': moderation_result['confidence'],
+                    'moderation_details': moderation_result.get('details', {}),
+                    'moderation_reasons': '; '.join(moderation_result.get('reasons', [])),
+                    'filtered_content': filter_bad_words(contenu) if moderation_result['confidence'] > 0.15 else ''
+                }
+            
+            # Sauvegarder avec les données de modération
+            interaction = serializer.save(utilisateur=user, **moderation_data)
+            
+            # Log de la création
+            if moderation_data:
+                print(f"✅ Interaction créée avec modération: {interaction.moderation_status} (score: {interaction.moderation_score:.2f})")
+            else:
+                print("✅ Interaction créée avec succès (pas de modération nécessaire)")
+                
         except Exception as e:
             print(f"❌ Erreur lors de la création: {str(e)}")
             import traceback
             traceback.print_exc()
             raise
     
-    def perform_create(self, serializer):
-        # Automatiquement assigner l'utilisateur connecté
-        serializer.save(utilisateur=self.request.user)
+    def _get_moderation_status(self, action):
+        """Convertit l'action de modération en statut"""
+        status_map = {
+            'approve': 'approved',
+            'flag': 'flagged',
+            'reject': 'rejected'
+        }
+        return status_map.get(action, 'pending')
     
     @action(detail=False, methods=['post'])
     def toggle_like(self, request):
@@ -1573,9 +1935,21 @@ class InteractionViewSet(viewsets.ModelViewSet):
         except Oeuvre.DoesNotExist:
             return Response({'error': 'Œuvre non trouvée'}, status=status.HTTP_404_NOT_FOUND)
         
+        # Vérifier l'authentification
+        print(f"🔍 toggle_like: request.user = {request.user}")
+        print(f"🔍 toggle_like: user.is_authenticated = {getattr(request.user, 'is_authenticated', 'N/A')}")
+        
+        if hasattr(request.user, 'is_authenticated') and request.user.is_authenticated:
+            user = request.user
+        else:
+            # Pour débugger : utiliser un utilisateur par défaut (temporaire)
+            from .models import Utilisateur
+            user = Utilisateur.objects.first()
+            print(f"⚠️ toggle_like: Utilisateur par défaut utilisé: {user}")
+        
         # Vérifier si l'utilisateur a déjà liké
         interaction, created = Interaction.objects.get_or_create(
-            utilisateur=request.user,
+            utilisateur=user,
             oeuvre=oeuvre,
             type='like',
             defaults={'contenu': '', 'plateforme_partage': ''}
@@ -1654,7 +2028,7 @@ class InteractionViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['post'], permission_classes=[AllowAny])  # À changer en IsAuthenticated plus tard
     def reply_to_comment(self, request):
-        """Créer une réponse à un commentaire"""
+        """Créer une réponse à un commentaire avec modération IA"""
         parent_id = request.data.get('parent')
         oeuvre_id = request.data.get('oeuvre')
         contenu = request.data.get('contenu')
@@ -1671,18 +2045,60 @@ class InteractionViewSet(viewsets.ModelViewSet):
             )
             oeuvre = Oeuvre.objects.get(id=oeuvre_id)
             
-            # Créer la réponse
+            # Modération IA du contenu de la réponse
+            contenu_clean = contenu.strip()
+            print(f"🤖 Analyse IA de la réponse: '{contenu_clean[:50]}...'")
+            
+            moderation_result = moderate_text(contenu_clean, context='reply')
+            print(f"🤖 Résultat modération réponse: {moderation_result}")
+            
+            # Rejeter si contenu trop problématique avec message convivial
+            if moderation_result['action'] == 'reject':
+                bad_words_found = moderation_result.get('details', {}).get('bad_words', {}).get('bad_words_found', [])
+                
+                if bad_words_found:
+                    user_message = "⚠️ Votre réponse contient des mots inappropriés et ne peut pas être publiée. Veuillez reformuler votre message de manière respectueuse."
+                    suggestion = f"💡 Suggestion : Essayez de remplacer les mots problématiques par des alternatives plus appropriées."
+                else:
+                    user_message = "⚠️ Votre réponse ne respecte pas nos règles de communauté et ne peut pas être publiée."
+                    suggestion = "💡 Suggestion : Reformulez votre message de manière plus constructive et respectueuse."
+                
+                return Response({
+                    'error': True,
+                    'type': 'moderation_reject',
+                    'title': '🚫 Réponse non autorisée',
+                    'message': user_message,
+                    'suggestion': suggestion,
+                    'filtered_preview': filter_bad_words(contenu_clean) if bad_words_found else None,
+                    'details': {
+                        'score': moderation_result['confidence'],
+                        'detected_issues': bad_words_found if bad_words_found else ['Contenu inapproprié']
+                    }
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Créer la réponse avec modération
             reply = Interaction.objects.create(
                 type='commentaire',
                 utilisateur=request.user if hasattr(request.user, 'is_authenticated') and request.user.is_authenticated else Utilisateur.objects.first(),  # Temporaire pour débuggage
                 oeuvre=oeuvre,
-                contenu=contenu.strip(),
-                parent=parent_comment
+                contenu=contenu_clean,
+                parent=parent_comment,
+                moderation_status=self._get_moderation_status(moderation_result['action']),
+                moderation_score=moderation_result['confidence'],
+                moderation_details=moderation_result.get('details', {}),
+                moderation_reasons='; '.join(moderation_result.get('reasons', [])),
+                filtered_content=filter_bad_words(contenu_clean) if moderation_result['confidence'] > 0.3 else ''
             )
+            
+            print(f"✅ Réponse créée avec modération: {reply.moderation_status} (score: {reply.moderation_score:.2f})")
             
             return Response({
                 'message': 'Réponse ajoutée avec succès',
-                'reply': InteractionSerializer(reply).data
+                'reply': InteractionSerializer(reply).data,
+                'moderation_info': {
+                    'status': reply.moderation_status,
+                    'score': reply.moderation_score
+                }
             }, status=status.HTTP_201_CREATED)
             
         except Interaction.DoesNotExist:
@@ -1694,6 +2110,9 @@ class InteractionViewSet(viewsets.ModelViewSet):
                 'error': 'Œuvre non trouvée'
             }, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
+            print(f"❌ Erreur lors de la création de la réponse: {str(e)}")
+            import traceback
+            traceback.print_exc()
             return Response({
                 'error': f'Erreur lors de la création de la réponse: {str(e)}'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -1711,11 +2130,23 @@ class InteractionViewSet(viewsets.ModelViewSet):
         try:
             oeuvre = Oeuvre.objects.get(id=oeuvre_id)
             
-            # Récupérer tous les commentaires principaux (sans parent)
-            main_comments = Interaction.objects.filter(
+            # Récupérer tous les commentaires principaux (sans parent) et visibles
+            queryset_filter = Q(
                 oeuvre=oeuvre,
                 type='commentaire',
                 parent__isnull=True
+            )
+            
+            # Ajouter le filtre de modération (sauf si admin)
+            if not (hasattr(self.request.user, 'role') and self.request.user.role == 'admin'):
+                queryset_filter &= Q(
+                    moderation_status__in=['approved', 'pending']
+                ) & Q(
+                    moderation_score__lt=0.8
+                )
+            
+            main_comments = Interaction.objects.filter(
+                queryset_filter
             ).select_related('utilisateur').prefetch_related(
                 'reponses__utilisateur'
             ).order_by('-date')
@@ -1725,8 +2156,16 @@ class InteractionViewSet(viewsets.ModelViewSet):
             for comment in main_comments:
                 comment_data = InteractionSerializer(comment).data
                 
-                # Ajouter les réponses
-                replies = comment.reponses.all().order_by('date')
+                # Ajouter les réponses (filtrées aussi)
+                replies_filter = Q(parent=comment)
+                if not (hasattr(self.request.user, 'role') and self.request.user.role == 'admin'):
+                    replies_filter &= Q(
+                        moderation_status__in=['approved', 'pending']
+                    ) & Q(
+                        moderation_score__lt=0.8
+                    )
+                
+                replies = Interaction.objects.filter(replies_filter).order_by('date')
                 comment_data['replies'] = InteractionSerializer(replies, many=True).data
                 comment_data['replies_count'] = replies.count()
                 

@@ -114,15 +114,22 @@ class InteractionSerializer(serializers.ModelSerializer):
     oeuvre_titre = serializers.SerializerMethodField()
     replies = serializers.SerializerMethodField()
     parent_id = serializers.IntegerField(source='parent.id', read_only=True)
+    display_content = serializers.SerializerMethodField()
+    is_visible = serializers.SerializerMethodField()
     
     class Meta:
         model = Interaction
         fields = [
             'id', 'type', 'utilisateur', 'utilisateur_nom', 
-            'oeuvre', 'oeuvre_titre', 'contenu', 'plateforme_partage', 
-            'date', 'parent', 'parent_id', 'replies'
+            'oeuvre', 'oeuvre_titre', 'contenu', 'display_content', 'plateforme_partage', 
+            'date', 'parent', 'parent_id', 'replies', 'is_visible',
+            'moderation_status', 'moderation_score', 'moderation_reasons', 'filtered_content'
         ]
-        read_only_fields = ['id', 'date', 'utilisateur_nom', 'oeuvre_titre', 'parent_id', 'replies']
+        read_only_fields = [
+            'id', 'date', 'utilisateur_nom', 'oeuvre_titre', 'parent_id', 'replies',
+            'display_content', 'is_visible', 'moderation_status', 'moderation_score', 
+            'moderation_reasons', 'filtered_content'
+        ]
     
     def get_utilisateur_nom(self, obj):
         return f"{obj.utilisateur.prenom} {obj.utilisateur.nom}"
@@ -130,18 +137,32 @@ class InteractionSerializer(serializers.ModelSerializer):
     def get_oeuvre_titre(self, obj):
         return obj.oeuvre.titre
     
+    def get_display_content(self, obj):
+        """Retourne le contenu à afficher (filtré si nécessaire)"""
+        return obj.get_display_content()
+    
+    def get_is_visible(self, obj):
+        """Retourne si l'interaction doit être visible publiquement"""
+        return obj.is_visible()
+    
     def get_replies(self, obj):
         """Récupérer les réponses pour un commentaire (seulement si c'est un commentaire principal)"""
         if obj.type == 'commentaire' and obj.parent is None:
-            replies = obj.reponses.all().order_by('date')
+            # Filtrer les réponses visibles seulement
+            replies = obj.reponses.filter(
+                moderation_status__in=['approved', 'pending'],
+                moderation_score__lt=0.8
+            ).order_by('date')
             # Éviter la récursion infinie en utilisant un serializer simplifié
             return [{
                 'id': reply.id,
                 'utilisateur_nom': f"{reply.utilisateur.prenom} {reply.utilisateur.nom}",
-                'contenu': reply.contenu,
+                'contenu': reply.get_display_content(),
                 'date': reply.date,
-                'parent_id': reply.parent.id if reply.parent else None
-            } for reply in replies]
+                'parent_id': reply.parent.id if reply.parent else None,
+                'moderation_status': reply.moderation_status,
+                'is_visible': reply.is_visible()
+            } for reply in replies if reply.is_visible()]
         return []
     
     def validate(self, data):

@@ -135,6 +135,62 @@ class Interaction(models.Model):
     
     date = models.DateTimeField(auto_now_add=True, verbose_name="Date")
     
+    # Champs de modération IA
+    MODERATION_STATUS_CHOICES = [
+        ('pending', 'En attente'),
+        ('approved', 'Approuvé'),
+        ('rejected', 'Rejeté'),
+        ('flagged', 'Signalé pour révision'),
+    ]
+    
+    moderation_status = models.CharField(
+        max_length=20,
+        choices=MODERATION_STATUS_CHOICES,
+        default='pending',
+        verbose_name="Statut de modération"
+    )
+    
+    moderation_score = models.FloatField(
+        default=0.0,
+        verbose_name="Score de problème (0-1)",
+        help_text="Score calculé par l'IA pour évaluer le niveau de problème du contenu"
+    )
+    
+    moderation_details = models.JSONField(
+        default=dict,
+        blank=True,
+        verbose_name="Détails de modération",
+        help_text="Détails techniques de l'analyse IA (bad words, toxicité, etc.)"
+    )
+    
+    moderation_reasons = models.TextField(
+        blank=True,
+        verbose_name="Raisons de modération",
+        help_text="Raisons détaillées pour le signalement ou rejet"
+    )
+    
+    filtered_content = models.TextField(
+        blank=True,
+        verbose_name="Contenu filtré",
+        help_text="Version du contenu avec les mots inappropriés censurés"
+    )
+    
+    reviewed_by = models.ForeignKey(
+        Utilisateur,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='moderated_interactions',
+        verbose_name="Révisé par",
+        help_text="Admin qui a révisé manuellement cette interaction"
+    )
+    
+    reviewed_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Date de révision"
+    )
+    
     class Meta:
         # Seuls les likes doivent être uniques par utilisateur/œuvre
         # Les commentaires et partages peuvent être multiples
@@ -149,8 +205,19 @@ class Interaction(models.Model):
         verbose_name_plural = "Interactions"
         ordering = ['-date']
 
+    
+    def is_visible(self):
+        """Détermine si l'interaction doit être visible publiquement"""
+        return self.moderation_status in ['approved', 'pending'] and self.moderation_score < 0.8
+    
+    def get_display_content(self):
+        """Retourne le contenu à afficher (filtré si nécessaire)"""
+        if self.filtered_content:
+            return self.filtered_content
+        return self.contenu
+    
     def __str__(self):
-        return f"{self.type} par {self.utilisateur} sur {self.oeuvre}"
+        return f"{self.type} par {self.utilisateur} sur {self.oeuvre} [{self.moderation_status}]"
 
 class Statistique(models.Model):
     oeuvre = models.ForeignKey(Oeuvre, on_delete=models.CASCADE, verbose_name="Œuvre")
