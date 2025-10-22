@@ -11,7 +11,7 @@ import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch'
 const OeuvreDetails = () => {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { user, isAuthenticated } = useAuth()
+  const { user, isAuthenticated, token } = useAuth()
   const [oeuvre, setOeuvre] = useState(null)
   const [auteur, setAuteur] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -50,6 +50,30 @@ const OeuvreDetails = () => {
   const [newReply, setNewReply] = useState('') // Contenu de la réponse
   const [loadingReply, setLoadingReply] = useState(false)
   const [showReplies, setShowReplies] = useState({}) // Pour afficher/masquer les réponses de chaque commentaire
+
+  // Fonction utilitaire pour faire des requêtes avec authentification
+  const makeAuthenticatedRequest = (method, url, data = null) => {
+    const config = {
+      method,
+      url,
+      withCredentials: true,
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    }
+
+    // Ajouter le header Authorization si un token est disponible
+    if (token) {
+      config.headers.Authorization = `Token ${token}`
+    }
+
+    // Ajouter les données si nécessaire
+    if (data && (method === 'post' || method === 'put' || method === 'patch')) {
+      config.data = data
+    }
+
+    return axios(config)
+  }
 
   useEffect(() => {
     fetchOeuvre()
@@ -274,14 +298,14 @@ const OeuvreDetails = () => {
     setLoadingReply(true)
 
     try {
-      const response = await axios.post(
+      const response = await makeAuthenticatedRequest(
+        'post',
         'http://localhost:8000/api/interactions/reply_to_comment/',
         {
           parent: replyingTo,
           oeuvre: id,
           contenu: newReply.trim()
-        },
-        { withCredentials: true }
+        }
       )
 
       console.log('✅ Réponse ajoutée:', response.data)
@@ -318,10 +342,10 @@ const OeuvreDetails = () => {
     try {
       setLoadingInteractions(prev => ({ ...prev, like: true }))
       
-      const response = await axios.post(
+      const response = await makeAuthenticatedRequest(
+        'post',
         'http://localhost:8000/api/interactions/toggle_like/',
-        { oeuvre: parseInt(id) }, // Convertir en entier
-        { withCredentials: true }
+        { oeuvre: parseInt(id) } // Convertir en entier
       )
 
       setInteractionStats(prev => ({
@@ -375,14 +399,14 @@ const OeuvreDetails = () => {
     try {
       setLoadingInteractions(prev => ({ ...prev, comment: true }))
       
-      await axios.post(
+      await makeAuthenticatedRequest(
+        'post',
         'http://localhost:8000/api/interactions/',
         {
           type: 'commentaire',
           oeuvre: parseInt(id), // Convertir en entier
           contenu: newComment.trim()
-        },
-        { withCredentials: true }
+        }
       )
 
 
@@ -508,14 +532,14 @@ const OeuvreDetails = () => {
     // Enregistrer le partage dans la base de données si l'utilisateur est connecté
     if (isAuthenticated) {
       try {
-        await axios.post(
+        await makeAuthenticatedRequest(
+          'post',
           'http://localhost:8000/api/interactions/',
           {
             type: 'partage',
             oeuvre: parseInt(id), // Convertir en entier
             plateforme_partage: platform
-          },
-          { withCredentials: true }
+          }
         )
         
         // Mettre à jour les statistiques

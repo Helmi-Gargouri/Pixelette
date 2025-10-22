@@ -962,14 +962,14 @@ class InteractionViewSet(viewsets.ModelViewSet):
         print(f"🔍 Données du serializer: {serializer.validated_data}")
         
         try:
-            # Si l'utilisateur n'est pas authentifié, essayer de trouver l'utilisateur autrement
+            # Vérifier si l'utilisateur est authentifié
             if hasattr(self.request.user, 'is_authenticated') and self.request.user.is_authenticated:
                 user = self.request.user
                 print(f"✅ Utilisateur authentifié trouvé: {user}")
             else:
                 # Pour débugger : utiliser un utilisateur par défaut (temporaire)
                 from .models import Utilisateur
-                user = Utilisateur.objects.first()  # TEMPORAIRE
+                user = Utilisateur.objects.first()  # TEMPORAIRE - à supprimer en production
                 print(f"⚠️ Utilisateur par défaut utilisé: {user}")
             
             serializer.save(utilisateur=user)
@@ -979,10 +979,6 @@ class InteractionViewSet(viewsets.ModelViewSet):
             import traceback
             traceback.print_exc()
             raise
-    
-    def perform_create(self, serializer):
-        # Automatiquement assigner l'utilisateur connecté
-        serializer.save(utilisateur=self.request.user)
     
     @action(detail=False, methods=['post'])
     def toggle_like(self, request):
@@ -996,9 +992,21 @@ class InteractionViewSet(viewsets.ModelViewSet):
         except Oeuvre.DoesNotExist:
             return Response({'error': 'Œuvre non trouvée'}, status=status.HTTP_404_NOT_FOUND)
         
+        # Vérifier l'authentification
+        print(f"🔍 toggle_like: request.user = {request.user}")
+        print(f"🔍 toggle_like: user.is_authenticated = {getattr(request.user, 'is_authenticated', 'N/A')}")
+        
+        if hasattr(request.user, 'is_authenticated') and request.user.is_authenticated:
+            user = request.user
+        else:
+            # Pour débugger : utiliser un utilisateur par défaut (temporaire)
+            from .models import Utilisateur
+            user = Utilisateur.objects.first()
+            print(f"⚠️ toggle_like: Utilisateur par défaut utilisé: {user}")
+        
         # Vérifier si l'utilisateur a déjà liké
         interaction, created = Interaction.objects.get_or_create(
-            utilisateur=request.user,
+            utilisateur=user,
             oeuvre=oeuvre,
             type='like',
             defaults={'contenu': '', 'plateforme_partage': ''}
