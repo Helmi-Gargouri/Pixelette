@@ -198,3 +198,7 @@ FRONTEND_URL = config('FRONTEND_URL', default='http://localhost:5173')
 SPOTIFY_CLIENT_ID = config('SPOTIFY_CLIENT_ID', default='')
 SPOTIFY_CLIENT_SECRET = config('SPOTIFY_CLIENT_SECRET', default='')
 SPOTIFY_REDIRECT_URI = config('SPOTIFY_REDIRECT_URI', default='http://127.0.0.1:8000/api/spotify/callback/')
+
+# OpenAI API Configuration
+OPENAI_API_KEY = config('OPENAI_API_KEY', default='')
+OPENAI_MODEL = config('OPENAI_MODEL', default='gpt-3.5-turbo')

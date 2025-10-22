@@ -51,6 +51,11 @@ const OeuvreDetails = () => {
   const [loadingReply, setLoadingReply] = useState(false)
   const [showReplies, setShowReplies] = useState({}) // Pour afficher/masquer les réponses de chaque commentaire
 
+  // États pour la génération IA de commentaires
+  const [loadingAI, setLoadingAI] = useState(false)
+  const [aiSuggestions, setAiSuggestions] = useState([])
+  const [showAISuggestions, setShowAISuggestions] = useState(false)
+
   // Fonction utilitaire pour faire des requêtes avec authentification
   const makeAuthenticatedRequest = (method, url, data = null) => {
     const config = {
@@ -359,6 +364,122 @@ const OeuvreDetails = () => {
     } finally {
       setLoadingReply(false)
     }
+  }
+
+  // Fonction pour générer un commentaire avec l'IA
+  const handleGenerateAIComment = async () => {
+    if (!isAuthenticated) {
+      setModal({
+        show: true,
+        title: 'Connexion requise',
+        message: 'Vous devez être connecté pour utiliser l\'IA',
+        type: 'error'
+      })
+      return
+    }
+
+    try {
+      setLoadingAI(true)
+      
+      const response = await makeAuthenticatedRequest(
+        'post',
+        `http://localhost:8000/api/oeuvres/${id}/generate_ai_comment/`,
+        {}
+      )
+
+      if (response.data.success) {
+        // Insérer le commentaire généré dans le textarea
+        setNewComment(response.data.comment)
+        
+        // Afficher une notification discrète au lieu d'une modal qui bloque
+        console.log(`✨ Commentaire IA généré - Style: ${response.data.style}, Confiance: ${(response.data.confidence * 100).toFixed(0)}%`)
+        
+        // Optionnel: afficher une notification temporaire
+        const notification = document.createElement('div')
+        notification.innerHTML = `
+          <div style="
+            position: fixed; 
+            top: 20px; 
+            right: 20px; 
+            background: #4CAF50; 
+            color: white; 
+            padding: 12px 20px; 
+            border-radius: 8px; 
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15); 
+            z-index: 9999;
+            font-family: Arial, sans-serif;
+            font-size: 14px;
+          ">
+            ✨ Commentaire IA généré avec succès !
+          </div>
+        `
+        document.body.appendChild(notification)
+        setTimeout(() => {
+          document.body.removeChild(notification)
+        }, 3000)
+        
+      } else {
+        setModal({
+          show: true,
+          title: 'Erreur IA',
+          message: response.data.error || 'Impossible de générer le commentaire',
+          type: 'error'
+        })
+      }
+    } catch (err) {
+      console.error('❌ Erreur génération IA:', err)
+      
+      let errorMessage = 'Erreur lors de la génération du commentaire IA'
+      
+      if (err.response?.status === 500) {
+        errorMessage = 'Service IA temporairement indisponible. Vérifiez la configuration OpenAI.'
+      } else if (err.response?.data?.error) {
+        errorMessage = err.response.data.error
+      }
+      
+      setModal({
+        show: true,
+        title: 'Erreur IA',
+        message: errorMessage,
+        type: 'error'
+      })
+    } finally {
+      setLoadingAI(false)
+    }
+  }
+
+  // Fonction pour générer plusieurs suggestions IA
+  const handleGenerateAISuggestions = async () => {
+    try {
+      setLoadingAI(true)
+      
+      const response = await makeAuthenticatedRequest(
+        'post',
+        `http://localhost:8000/api/oeuvres/${id}/generate_multiple_ai_comments/`,
+        { count: 3 }
+      )
+
+      if (response.data.success) {
+        setAiSuggestions(response.data.suggestions)
+        setShowAISuggestions(true)
+      }
+    } catch (err) {
+      console.error('❌ Erreur suggestions IA:', err)
+    } finally {
+      setLoadingAI(false)
+    }
+  }
+
+  // Fonction pour sélectionner une suggestion IA
+  const handleSelectAISuggestion = (suggestion) => {
+    setNewComment(suggestion.comment)
+    setShowAISuggestions(false)
+    setModal({
+      show: true,
+      title: '✨ Suggestion sélectionnée',
+      message: `Style "${suggestion.style}" appliqué au commentaire`,
+      type: 'success'
+    })
   }
 
   // Fonction pour toggle like
@@ -1441,21 +1562,54 @@ const OeuvreDetails = () => {
                               onBlur={(e) => e.target.style.borderColor = '#e9ecef'}
                             />
                             <div className="d-flex justify-content-between align-items-center mt-3">
-                              <small className="text-muted">
-                                <i className="fas fa-info-circle me-1"></i>
-                                Soyez respectueux dans vos commentaires
-                              </small>
-                              <button 
-                                type="submit"
-                                disabled={loadingInteractions.comment || !newComment.trim()}
-                                className="btn btn-primary"
-                                style={{
-                                  borderRadius: '20px',
-                                  padding: '8px 25px',
-                                  fontWeight: '500',
-                                  minWidth: '120px'
-                                }}
-                              >
+                              <div className="d-flex align-items-center gap-2">
+                                <small className="text-muted">
+                                  <i className="fas fa-info-circle me-1"></i>
+                                  Soyez respectueux dans vos commentaires
+                                </small>
+                                
+                                {/* Bouton génération IA */}
+                                <button 
+                                  type="button"
+                                  onClick={handleGenerateAIComment}
+                                  disabled={loadingAI || loadingInteractions.comment}
+                                  className="btn btn-outline-success btn-sm"
+                                  style={{
+                                    borderRadius: '15px',
+                                    padding: '4px 12px',
+                                    fontSize: '0.8rem',
+                                    fontWeight: '500',
+                                    border: '1px solid #28a745',
+                                    background: loadingAI ? '#f8f9fa' : 'transparent'
+                                  }}
+                                  title="Générer un commentaire avec l'IA"
+                                >
+                                  {loadingAI ? (
+                                    <>
+                                      <i className="fas fa-spinner fa-spin me-1"></i>
+                                      IA...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <i className="fas fa-magic me-1"></i>
+                                      ✨ IA
+                                    </>
+                                  )}
+                                </button>
+                              </div>
+                              
+                              <div className="d-flex gap-2">
+                                <button 
+                                  type="submit"
+                                  disabled={loadingInteractions.comment || !newComment.trim()}
+                                  className="btn btn-primary"
+                                  style={{
+                                    borderRadius: '20px',
+                                    padding: '8px 25px',
+                                    fontWeight: '500',
+                                    minWidth: '120px'
+                                  }}
+                                >
                                 {loadingInteractions.comment ? (
                                   <>
                                     <i className="fas fa-spinner fa-spin me-2"></i>
@@ -1468,6 +1622,7 @@ const OeuvreDetails = () => {
                                   </>
                                 )}
                               </button>
+                              </div>
                             </div>
                           </div>
                         </div>

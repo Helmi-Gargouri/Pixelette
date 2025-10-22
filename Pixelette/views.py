@@ -5,6 +5,7 @@ from .utils.color_analysis import analyze_galerie_palette
 from .utils.clustering import cluster_galeries
 from .utils.spotify import generate_playlist_for_gallery, search_playlists_by_theme, get_spotify_oauth, create_playlist_in_user_account
 from .utils.content_moderation import moderate_text, filter_bad_words
+from .utils.ai_comment_generator import generate_ai_comment, generate_multiple_ai_comments
 from rest_framework.permissions import IsAuthenticatedOrReadOnly
 from rest_framework import viewsets
 from .models import Utilisateur, Oeuvre, Galerie, Interaction, Statistique, GalerieInvitation, Suivi
@@ -50,6 +51,9 @@ import uuid
 import requests
 import io
 from PIL import Image
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class IsAdmin(permissions.BasePermission):
@@ -521,6 +525,91 @@ class OeuvreViewSet(viewsets.ModelViewSet):
                 {'error': f'Erreur lors de la génération: {str(e)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+    @action(detail=True, methods=['post'], permission_classes=[AllowAny])
+    def generate_ai_comment(self, request, pk=None):
+        """Générer un commentaire IA intelligent basé sur l'œuvre"""
+        try:
+            # Récupérer l'œuvre
+            oeuvre = self.get_object()
+            
+            # Préparer les données pour l'IA
+            oeuvre_data = {
+                'titre': oeuvre.titre,
+                'description': oeuvre.description or '',
+                'technique': '',  # Pas de champ technique dans le modèle
+                'dimension': '',  # Pas de champ dimension dans le modèle
+                'auteur_nom': oeuvre.auteur.nom if hasattr(oeuvre.auteur, 'nom') else str(oeuvre.auteur),
+                'date_creation': str(oeuvre.date_creation.year) if oeuvre.date_creation else ''
+            }
+            
+            # Générer le commentaire avec l'IA
+            ai_result = generate_ai_comment(oeuvre_data)
+            
+            if ai_result['success']:
+                return Response({
+                    'success': True,
+                    'comment': ai_result['comment'],
+                    'style': ai_result['style'],
+                    'confidence': ai_result['confidence'],
+                    'metadata': ai_result['metadata'],
+                    'message': f'Commentaire IA généré avec style "{ai_result["style"]}"'
+                })
+            else:
+                return Response({
+                    'success': False,
+                    'error': ai_result['error']
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                
+        except Exception as e:
+            logger.error(f"Erreur génération commentaire IA: {e}")
+            return Response({
+                'success': False,
+                'error': f'Erreur interne: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(detail=True, methods=['post'], permission_classes=[AllowAny])
+    def generate_multiple_ai_comments(self, request, pk=None):
+        """Générer plusieurs suggestions de commentaires IA avec différents styles"""
+        try:
+            oeuvre = self.get_object()
+            count = int(request.data.get('count', 3))  # Par défaut 3 suggestions
+            
+            if count > 5:  # Limite pour éviter les abus
+                count = 5
+            
+            # Préparer les données
+            oeuvre_data = {
+                'titre': oeuvre.titre,
+                'description': oeuvre.description or '',
+                'technique': '',  # Pas de champ technique dans le modèle
+                'dimension': '',  # Pas de champ dimension dans le modèle
+                'auteur_nom': oeuvre.auteur.nom if hasattr(oeuvre.auteur, 'nom') else str(oeuvre.auteur),
+                'date_creation': str(oeuvre.date_creation.year) if oeuvre.date_creation else ''
+            }
+            
+            # Générer plusieurs suggestions
+            suggestions = generate_multiple_ai_comments(oeuvre_data, count)
+            
+            if suggestions:
+                return Response({
+                    'success': True,
+                    'suggestions': suggestions,
+                    'count': len(suggestions),
+                    'message': f'{len(suggestions)} suggestions générées'
+                })
+            else:
+                return Response({
+                    'success': False,
+                    'error': 'Aucune suggestion générée'
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                
+        except Exception as e:
+            logger.error(f"Erreur génération suggestions IA: {e}")
+            return Response({
+                'success': False,
+                'error': f'Erreur interne: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class GalerieViewSet(viewsets.ModelViewSet):
     queryset = Galerie.objects.all()
