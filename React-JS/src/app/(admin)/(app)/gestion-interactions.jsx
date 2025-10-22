@@ -318,7 +318,18 @@ const GestionInteractions = () => {
                   <td className="px-3.5 py-3">{getTypeBadge(interaction.type)}</td>
                   <td className="px-3.5 py-3">{interaction.utilisateur_nom}</td>
                   <td className="px-3.5 py-3 max-w-xs truncate">{interaction.oeuvre_titre}</td>
-                  <td className="px-3.5 py-3">{interaction.plateforme_partage || '-'}</td>
+                  <td className="px-3.5 py-3 max-w-xs">
+                    {interaction.type === 'commentaire' ? (
+                      <div className="truncate" title={interaction.contenu}>
+                        <span className="inline-flex items-center gap-1">
+                          <MessageSquare className="h-3 w-3 text-blue-500" />
+                          {interaction.contenu || 'Contenu vide'}
+                        </span>
+                      </div>
+                    ) : (
+                      interaction.plateforme_partage || '-'
+                    )}
+                  </td>
                   <td className="px-3.5 py-3">
                     {new Date(interaction.date).toLocaleDateString('fr-FR', {
                       day: '2-digit',
