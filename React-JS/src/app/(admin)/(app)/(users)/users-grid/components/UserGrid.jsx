@@ -71,7 +71,7 @@ const fetchUsers = async () => {
       throw new Error('Aucun token trouvé dans localStorage');
     }
 
-const response = await axios.get(`${API_BASE}utilisateurs/`, {
+const response = await axios.get(`${API_BASE}/utilisateurs/`, {
       headers: {
         Authorization: `Token ${token}`,
         'Content-Type': 'application/json',
@@ -185,7 +185,7 @@ const response = await axios.get(`${API_BASE}utilisateurs/`, {
     try {
       const token = localStorage.getItem('token');
       const response = await axios.post(
-      `${API_BASE}utilisateurs/`,
+      `${API_BASE}/utilisateurs/`,
       addForm,
         {
           headers: { Authorization: `Token ${token}` },
@@ -221,7 +221,7 @@ const response = await axios.get(`${API_BASE}utilisateurs/`, {
     try {
       const token = localStorage.getItem('token');
       const response = await axios.patch(
-        `${API_BASE}utilisateurs/${selectedUser.id}/`,
+        `${API_BASE}/utilisateurs/${selectedUser.id}/`,
         editForm,
         {
           headers: { Authorization: `Token ${token}` },
@@ -249,7 +249,7 @@ const response = await axios.get(`${API_BASE}utilisateurs/`, {
     setIsSubmitting(true);
     try {
       const token = localStorage.getItem('token');
-    await axios.delete(`${API_BASE}utilisateurs/${userId}/`, {
+    await axios.delete(`${API_BASE}/utilisateurs/${userId}/`, {
           headers: { Authorization: `Token ${token}` },
         withCredentials: true,
       });

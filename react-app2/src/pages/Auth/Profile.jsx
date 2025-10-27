@@ -233,7 +233,7 @@ const getScoreColor = (percentage) => {
     
     try {
       const response = await axios.post(
-        `${API_BASE}utilisateurs/disable_2fa/`, 
+        `${API_BASE}/utilisateurs/disable_2fa/`, 
         {}, 
         {
           withCredentials: true
@@ -310,7 +310,7 @@ const getScoreColor = (percentage) => {
     formData.append('image', selectedImage);
     setIsUploading(true);
     try {
-      const response = await axios.patch(`${API_BASE}utilisateurs/${user.id}/`, formData, {
+      const response = await axios.patch(`${API_BASE}/utilisateurs/${user.id}/`, formData, {
         headers: { 
           'Content-Type': 'multipart/form-data'
         },
@@ -338,7 +338,7 @@ const imageUrl = response.data.image.startsWith('http')
     e.preventDefault();
     setIsSubmitting(true);
     try {
-      const response = await axios.patch(`${API_BASE}utilisateurs/${user.id}/`, {
+      const response = await axios.patch(`${API_BASE}/utilisateurs/${user.id}/`, {
         prenom,
         nom,
         telephone
@@ -363,7 +363,7 @@ const imageUrl = response.data.image.startsWith('http')
   const handleDeleteConfirm = async () => {
     setConfirmModal(false);
     try {
-      await axios.delete(`${API_BASE}utilisateurs/${user.id}/`, {
+      await axios.delete(`${API_BASE}/utilisateurs/${user.id}/`, {
         withCredentials: true
       });
       localStorage.removeItem('token');
@@ -427,7 +427,7 @@ const imageUrl = response.data.image.startsWith('http')
     
     try {
       const response = await axios.post(
-        `${API_BASE}utilisateurs/enable_2fa/`, 
+        `${API_BASE}/utilisateurs/enable_2fa/`, 
         {}, 
         {
           withCredentials: true

@@ -17,7 +17,7 @@ const Login = () => {
     e.preventDefault();
     try {
       const response = await axios.post(
-        `${API_BASE}utilisateurs/login/`,
+        `${API_BASE}/utilisateurs/login/`,
         { email, password },
         { withCredentials: true }
       );

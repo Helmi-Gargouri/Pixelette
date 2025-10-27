@@ -117,7 +117,7 @@ const MEDIA_BASE = import.meta.env.VITE_MEDIA_URL || 'http://localhost:8000';
       // Fetch auteur details
       if (response.data.auteur) {
         const auteurResponse = await axios.get(
-          `${API_BASE}utilisateurs/${response.data.auteur}/`,
+          `${API_BASE}/utilisateurs/${response.data.auteur}/`,
           { withCredentials: true }
         )
         setAuteur(auteurResponse.data)

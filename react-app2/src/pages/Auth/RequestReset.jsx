@@ -11,7 +11,7 @@ const RequestReset = () => {
     const handleSubmit = async (e) => {
       e.preventDefault();
       try {
-        await axios.post(`${API_BASE}utilisateurs/request_password_reset/`, { email });
+        await axios.post(`${API_BASE}/utilisateurs/request_password_reset/`, { email });
         setMessage('Email envoyé ! Vérifiez votre boîte.');
         setTimeout(() => navigate('/login'), 3000);
       } catch (error) {

@@ -28,7 +28,7 @@ const ArtistesList = () => {
 
   const fetchArtistes = async () => {
     try {
-      const response = await axios.get(`${API_BASE}utilisateurs/artistes/`, {
+      const response = await axios.get(`${API_BASE}/utilisateurs/artistes/`, {
         withCredentials: true
       })
       setArtistes(response.data.artistes)

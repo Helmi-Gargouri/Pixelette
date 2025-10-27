@@ -43,7 +43,7 @@ const Index = () => {
       setGaleries(galeriesRes.data);
 
       try {
-        const countRes = await axios.get(`${API_BASE}utilisateurs/count/`, { 
+        const countRes = await axios.get(`${API_BASE}/utilisateurs/count/`, { 
           withCredentials: true 
         });
         const fakeUsers = Array(countRes.data.count).fill({ id: 0 });

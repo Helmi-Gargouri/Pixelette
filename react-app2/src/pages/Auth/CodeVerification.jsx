@@ -27,7 +27,7 @@ const CodeVerification = () => {
     }
     setIsLoading(true);
     try {
-      await axios.post(`${API_BASE}utilisateurs/verify_code/`, { email, reset_code: code });
+      await axios.post(`${API_BASE}/utilisateurs/verify_code/`, { email, reset_code: code });
       setModal({ show: true, title: 'Succès !', message: 'Code vérifié !', type: 'success' });
       setTimeout(() => navigate('/reset-password', { state: { email, resetCode: code } }), 1500);
     } catch (error) {

@@ -75,7 +75,7 @@ const Register = () => {
 
     setIsSubmitting(true);
     try {
-      await axios.post(`${API_BASE}utilisateurs/`, 
+      await axios.post(`${API_BASE}/utilisateurs/`, 
         { ...formData, password_confirm: formData.passwordConfirm },
         { withCredentials: true }
       );

@@ -28,7 +28,7 @@ const InviteModal = ({ show, onClose, galerieId, galerieName }) => {
 
   const fetchUsers = async () => {
     try {
-      const response = await axios.get(`${API_BASE}utilisateurs/`, {
+      const response = await axios.get(`${API_BASE}/utilisateurs/`, {
         withCredentials: true
       })
       setUsers(response.data)

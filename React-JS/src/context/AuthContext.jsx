@@ -61,7 +61,7 @@ export const AuthProvider = ({ children }) => {
         // NEW: Restore ONLY once (no spam every second)
         if (!sessionRestored) {
           try {
-            await axios.post(`${API_BASE}utilisateurs/restore_session/`, {
+            await axios.post(`${API_BASE}/utilisateurs/restore_session/`, {
               token: token,
               user_id: userDataTemp.id,
             }, {
@@ -139,7 +139,7 @@ export const AuthProvider = ({ children }) => {
   const fetchProfile = async (token) => {
     try {
       console.log('📤 Fetch profile with token:', token.substring(0, 10) + '...');
-      const response = await axios.get(`${API_BASE}utilisateurs/profile/`, {
+      const response = await axios.get(`${API_BASE}/utilisateurs/profile/`, {
         headers: { Authorization: `Token ${token}` },
         withCredentials: true,
       });
@@ -173,7 +173,7 @@ export const AuthProvider = ({ children }) => {
     try {
       const token = localStorage.getItem('token');
       if (token) {
-        await axios.post(`${API_BASE}utilisateurs/logout/`, {}, {
+        await axios.post(`${API_BASE}/utilisateurs/logout/`, {}, {
           headers: { Authorization: `Token ${token}` },
           withCredentials: true,
         });

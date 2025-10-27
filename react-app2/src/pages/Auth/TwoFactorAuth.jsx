@@ -78,7 +78,7 @@ const BACKOFFICE_URL = import.meta.env.VITE_BACKOFFICE_URL || 'http://localhost:
         console.log('📤 Envoi requête QR code avec email:', email);
 
         const response = await axios.post(
-          `${API_BASE}utilisateurs/verify_2fa/`,
+          `${API_BASE}/utilisateurs/verify_2fa/`,
           { email },
           {
             withCredentials: true,
@@ -195,7 +195,7 @@ const BACKOFFICE_URL = import.meta.env.VITE_BACKOFFICE_URL || 'http://localhost:
       console.log('📤 Envoi code 2FA:', { email, code });
 
       const response = await axios.post(
-        `${API_BASE}utilisateurs/verify_2fa/`,
+        `${API_BASE}/utilisateurs/verify_2fa/`,
         { email, token: code },
         { withCredentials: true }
       );

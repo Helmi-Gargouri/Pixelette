@@ -23,7 +23,7 @@ const AdminDemands = () => {
 
   const fetchCurrentRole = async (token) => {
     try {
-      const response = await axios.get(`${API_BASE}utilisateurs/profile/`, {
+      const response = await axios.get(`${API_BASE}/utilisateurs/profile/`, {
         headers: { Authorization: `Token ${token}` },
         withCredentials: true
       });

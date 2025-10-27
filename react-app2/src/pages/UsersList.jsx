@@ -26,7 +26,7 @@ const UsersList = () => {
 
   const fetchCurrentRole = async (token) => {
     try {
-      const response = await axios.get(`${API_BASE}utilisateurs/profile/`, {
+      const response = await axios.get(`${API_BASE}/utilisateurs/profile/`, {
         headers: { Authorization: `Token ${token}` },
         withCredentials: true
       });
@@ -49,7 +49,7 @@ const UsersList = () => {
 
   const fetchUsers = async (token) => {
     try {
-      const response = await axios.get(`${API_BASE}utilisateurs/`, {
+      const response = await axios.get(`${API_BASE}/utilisateurs/`, {
         headers: { Authorization: `Token ${token}` },
         withCredentials: true
       });
@@ -83,7 +83,7 @@ const UsersList = () => {
     if (!selectedUser) return;
     const token = localStorage.getItem('token');
     try {
-      await axios.patch(`${API_BASE}utilisateurs/${selectedUser.id}/`, editForm, {
+      await axios.patch(`${API_BASE}/utilisateurs/${selectedUser.id}/`, editForm, {
         headers: { Authorization: `Token ${token}` },
         withCredentials: true
       });
@@ -109,7 +109,7 @@ const UsersList = () => {
     if (!window.confirm('Confirmer suppression ?')) return;
     try {
       const token = localStorage.getItem('token');
-      await axios.delete(`${API_BASE}utilisateurs/${userId}/`, {
+      await axios.delete(`${API_BASE}/utilisateurs/${userId}/`, {
         headers: { Authorization: `Token ${token}` },
         withCredentials: true
       });

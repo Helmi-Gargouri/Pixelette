@@ -41,7 +41,7 @@ const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
       
       if (response.data.proprietaire) {
         const propResponse = await axios.get(
-          `${API_BASE}utilisateurs/${response.data.proprietaire}/`,
+          `${API_BASE}/utilisateurs/${response.data.proprietaire}/`,
           { withCredentials: true }
         )
         setProprietaire(propResponse.data)

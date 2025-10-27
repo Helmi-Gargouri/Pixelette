@@ -14,7 +14,7 @@ const ForgotPassword = () => {
     e.preventDefault();
     setIsLoading(true);
     try {
-      const response = await axios.post(`${API_BASE}utilisateurs/forgot_password/`, { email });
+      const response = await axios.post(`${API_BASE}/utilisateurs/forgot_password/`, { email });
       setModal({ show: true, title: 'Succès !', message: response.data.message, type: 'success' });
       setTimeout(() => navigate('/code-verification', { state: { email } }), 2000);
     } catch (error) {

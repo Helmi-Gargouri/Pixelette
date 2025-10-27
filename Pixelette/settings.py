@@ -178,7 +178,8 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:5173",  # Alternative
     "http://localhost:5174",  # Port Backoffice par défaut
     "http://127.0.0.1:5174",
-    "https://Pixelette-backoffice.onrender.com",
+    "https://pixelette-backoffice.onrender.com",  # Backoffice (minuscule pour match)
+    "https://pixelette.onrender.com",  # Frontend (ajouté – ton origine)
 ]
 
 CORS_ALLOW_HEADERS = [
