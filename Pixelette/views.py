@@ -210,9 +210,9 @@ class IsAdmin(permissions.BasePermission):
 
 
 class IsAdminOrSession(permissions.BasePermission):
-    """Permission that accepts either a DRF-authenticated Utilisateur with role 'admin'
-    or a session-based user_id pointing to an admin Utilisateur.
-    This allows the frontend (which uses cookies/session) to be treated as admin
+    """Permission that accepts either a DRF-authenticated Utilisateur with role 'admin' or 'artiste'
+    or a session-based user_id pointing to an admin or artiste Utilisateur.
+    This allows the frontend (which uses cookies/session) to be treated as admin/artiste
     even when request.user is not the custom Utilisateur instance.
     """
     def has_permission(self, request, view):
@@ -225,8 +225,9 @@ class IsAdminOrSession(permissions.BasePermission):
         
         if user and hasattr(user, 'role'):
             print(f"📋 user.role: {user.role}")
-            if user.role == 'admin':
-                print("✅ Admin détecté via request.user")
+            # ✅ Autoriser admin ET artiste
+            if user.role in ['admin', 'artiste']:
+                print(f"✅ {user.role} détecté via request.user")
                 return True
 
         # Fallback: check session for our custom user_id
@@ -240,14 +241,15 @@ class IsAdminOrSession(permissions.BasePermission):
         try:
             u = Utilisateur.objects.get(id=uid)
             print(f"📋 Utilisateur trouvé: {u.email} (role: {u.role})")
-            is_admin = getattr(u, 'role', None) == 'admin'
-            print(f"📋 Is admin: {is_admin}")
-            return is_admin
+            # ✅ Autoriser admin ET artiste
+            is_allowed = getattr(u, 'role', None) in ['admin', 'artiste']
+            print(f"📋 Accès autorisé: {is_allowed}")
+            return is_allowed
         except Utilisateur.DoesNotExist:
             print(f"❌ Utilisateur {uid} non trouvé")
             return False
         except Exception as e:
-            print(f"❌ Erreur dans IsAdminOrSession: {str(e)}")
+            print(f"❌ Erreur dans IsAdminOrSession: {str(e)}") 
             return False
     
 class CustomTokenGenerator(PasswordResetTokenGenerator):
