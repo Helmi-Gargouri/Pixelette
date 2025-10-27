@@ -267,62 +267,62 @@ class UtilisateurViewSet(viewsets.ModelViewSet):
     serializer_class = UtilisateurSerializer
     permission_classes = [AllowAny]  
 
-def get_permissions(self):
-    """
-    Définir les permissions selon l'action
-    """
-    print(f"🔍 get_permissions appelé pour action: {self.action}")
-    
-    # ✅ Actions PUBLIQUES (pas d'authentification requise)
-    public_actions = [
-        'create',           # Inscription
-        'login',            # Connexion
-        'logout',           # Déconnexion
-        'generate_2fa',     # Génération 2FA
-        'enable_2fa',       # Activation 2FA
-        'verify_2fa',       # Vérification 2FA
-        'disable_2fa',      # Désactivation 2FA
-        'get_2fa_qr',       # QR code 2FA
-        'forgot_password',  # Mot de passe oublié
-        'verify_code',      # Vérification code reset
-        'reset_password_code',  # Reset password
-        'request_password_reset',
-        'count',            # Compteur utilisateurs
-        'artistes',         # Liste des artistes
-        'restore_session',  # Restauration session
-        'demander_artiste', # Demande rôle artiste
-        'statut_demande',   # Statut demande
-        'list',             # ✅ AJOUT : Liste des utilisateurs (publique)
-    ]
-    
-    if self.action in public_actions:
-        permission_classes = [AllowAny]
-        print(f"✅ Permission AllowAny pour {self.action}")
-    
-    # ✅ Actions ADMIN UNIQUEMENT
-    elif self.action in ['assign_role', 'recalculer_tous_scores', 'dashboard_artiste_potential']:
-        permission_classes = [IsAdmin]
-        print(f"✅ Permission IsAdmin pour {self.action}")
-    
-    # ✅ Actions AUTHENTIFIÉES (utilisateurs connectés)
-    elif self.action in [
-        'profile',
-        'mon_score_artiste',
-        'retrieve',         # Détail utilisateur
-        'update',           # Modifier utilisateur
-        'partial_update',   # Modifier partiellement
-        'destroy',          # Supprimer utilisateur
-        'request_artist_role',
-    ]:
-        permission_classes = [IsAuthenticated]
-        print(f"✅ Permission IsAuthenticated pour {self.action}")
-    
-    # ✅ Défaut : Admin ou Session (pour actions non listées)
-    else:
-        permission_classes = [IsAdminOrSession]
-        print(f"⚠️ Permission IsAdminOrSession pour {self.action}")
-    
-    return [permission() for permission in permission_classes]
+    def get_permissions(self):
+        """
+        Définir les permissions selon l'action
+        """
+        print(f"🔍 get_permissions appelé pour action: {self.action}")
+        
+        # ✅ Actions PUBLIQUES (pas d'authentification requise)
+        public_actions = [
+            'create',           # Inscription
+            'login',            # Connexion
+            'logout',           # Déconnexion
+            'generate_2fa',     # Génération 2FA
+            'enable_2fa',       # Activation 2FA
+            'verify_2fa',       # Vérification 2FA
+            'disable_2fa',      # Désactivation 2FA
+            'get_2fa_qr',       # QR code 2FA
+            'forgot_password',  # Mot de passe oublié
+            'verify_code',      # Vérification code reset
+            'reset_password_code',  # Reset password
+            'request_password_reset',
+            'count',            # Compteur utilisateurs
+            'artistes',         # Liste des artistes
+            'restore_session',  # Restauration session
+            'demander_artiste', # Demande rôle artiste
+            'statut_demande',   # Statut demande
+            'list',             # ✅ AJOUT : Liste des utilisateurs (publique)
+        ]
+        
+        if self.action in public_actions:
+            permission_classes = [AllowAny]
+            print(f"✅ Permission AllowAny pour {self.action}")
+        
+        # ✅ Actions ADMIN UNIQUEMENT
+        elif self.action in ['assign_role', 'recalculer_tous_scores', 'dashboard_artiste_potential']:
+            permission_classes = [IsAdmin]
+            print(f"✅ Permission IsAdmin pour {self.action}")
+        
+        # ✅ Actions AUTHENTIFIÉES (utilisateurs connectés)
+        elif self.action in [
+            'profile',
+            'mon_score_artiste',
+            'retrieve',         # Détail utilisateur
+            'update',           # Modifier utilisateur
+            'partial_update',   # Modifier partiellement
+            'destroy',          # Supprimer utilisateur
+            'request_artist_role',
+        ]:
+            permission_classes = [IsAuthenticated]
+            print(f"✅ Permission IsAuthenticated pour {self.action}")
+        
+        # ✅ Défaut : Admin ou Session (pour actions non listées)
+        else:
+            permission_classes = [IsAdminOrSession]
+            print(f"⚠️ Permission IsAdminOrSession pour {self.action}")
+        
+        return [permission() for permission in permission_classes]
     
     @action(detail=False, methods=['get'], permission_classes=[AllowAny])
     def count(self, request):
