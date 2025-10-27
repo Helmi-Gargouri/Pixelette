@@ -47,7 +47,7 @@ const AdminLogin = lazy(() => import('@/app/(auth)/admin-login'));
 const DemandesRoles = lazy(() => import('@/app/(admin)/(app)/demandes-roles'));
 const UserGrid = lazy(() => import('@/app/(admin)/(app)/(users)/users-grid'));
 const UserList = lazy(() => import('@/app/(admin)/(app)/(users)/users-list'));
-const Profile = lazy(() => import('@/app/(auth)/profile'));
+const Profile = lazy(() => import('@/app/(auth)/Profile'));
 const BasicCreatePassword = lazy(() => import('@/app/(auth)/basic-create-password'));
 const BasicLogin = lazy(() => import('@/app/(auth)/basic-login'));
 const BasicRegister = lazy(() => import('@/app/(auth)/basic-register'));
