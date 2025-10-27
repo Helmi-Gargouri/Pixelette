@@ -46,16 +46,17 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'corsheaders',  # ✅ CORS avant rest_framework
     'rest_framework',
-    'corsheaders',
-    'Pixelette',
     'rest_framework.authtoken',
+    'Pixelette',
 ]
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',  
+    'Pixelette.middleware.ForceCorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
-    'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -137,11 +138,11 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # REST Framework Configuration
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'Pixelette.authentication.UtilisateurTokenAuthentication',
-        'Pixelette.authentication.UtilisateurSessionAuthentication',
+        'rest_framework.authentication.TokenAuthentication',  # ✅ DRF Standard
+        'rest_framework.authentication.SessionAuthentication',  # ✅ DRF Standard
     ],
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.IsAuthenticated',
+        'rest_framework.permissions.AllowAny',  # ✅ Par défaut : public
     ],
 }
 
@@ -153,7 +154,11 @@ CACHES = {
     }
 }
 
-# CORS Configuration
+# ========================================
+# CONFIGURATION CORS COMPLÈTE
+# ========================================
+
+# Origins autorisées
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
@@ -161,13 +166,14 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:5174",
 ]
 
-# Ajouter les URLs de production si pas en DEBUG
+# Ajouter les URLs de production
 if not DEBUG:
     CORS_ALLOWED_ORIGINS.extend([
         "https://pixelette.onrender.com",
         "https://pixelette-backoffice.onrender.com",
     ])
 
+# ✅ Configuration CORS complète
 CORS_ALLOW_CREDENTIALS = True
 
 CORS_ALLOW_METHODS = [
@@ -190,6 +196,15 @@ CORS_ALLOW_HEADERS = [
     'x-csrftoken',
     'x-requested-with',
 ]
+
+# ✅ Headers exposés pour le frontend
+CORS_EXPOSE_HEADERS = [
+    'content-type',
+    'x-csrftoken',
+]
+
+# ✅ Préflight cache (2h)
+CORS_PREFLIGHT_MAX_AGE = 7200
 
 # Session Configuration
 SESSION_ENGINE = 'django.contrib.sessions.backends.db'
@@ -236,3 +251,32 @@ GEMINI_API_KEY_USER_1 = config('GEMINI_API_KEY_USER_1', default='')
 # OpenAI API Configuration
 OPENAI_API_KEY = config('OPENAI_API_KEY', default='')
 OPENAI_MODEL = config('OPENAI_MODEL', default='gpt-3.5-turbo')
+
+# ========================================
+# LOGGING POUR DEBUG (PRODUCTION)
+# ========================================
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'INFO',
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'corsheaders': {
+            'handlers': ['console'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+    },
+}
