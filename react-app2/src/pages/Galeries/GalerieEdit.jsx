@@ -25,7 +25,7 @@ const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
   const fetchGalerie = async () => {
     try {
-      const response = await axios.get(`${API_BASE}galeries/${id}/`, {
+      const response = await axios.get(`${API_BASE}/galeries/${id}/`, {
         withCredentials: true
       })
       const galerie = response.data

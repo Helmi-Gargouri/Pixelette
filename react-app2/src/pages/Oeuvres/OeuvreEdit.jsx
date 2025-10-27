@@ -26,7 +26,7 @@ const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
   const fetchOeuvre = async () => {
     try {
-      const response = await axios.get(`${API_BASE}oeuvres/${id}/`, {
+      const response = await axios.get(`${API_BASE}/oeuvres/${id}/`, {
         withCredentials: true
       })
       const oeuvre = response.data
@@ -116,7 +116,7 @@ const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
       }
       
       const token = localStorage.getItem('token')
-      await axios.put(`${API_BASE}oeuvres/${id}/`, data, {
+      await axios.put(`${API_BASE}/oeuvres/${id}/`, data, {
         withCredentials: true,
         headers: {
           Authorization: `Token ${token}`,

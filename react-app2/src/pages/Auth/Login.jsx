@@ -48,7 +48,7 @@ const Login = () => {
             try {
               console.log('✅ Admin détecté, envoi des données à l\'API temporaire...');
               const storeResponse = await axios.post(
-                `${API_BASE}auth/store_temp/`,
+                `${API_BASE}/auth/store_temp/`,
                 {
                   token: response.data.token,
                   user: userData,

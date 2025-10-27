@@ -34,7 +34,7 @@ const MesOeuvres = () => {
 
   const fetchOeuvres = async () => {
     try {
-      const response = await axios.get(`${API_BASE}oeuvres/`, {
+      const response = await axios.get(`${API_BASE}/oeuvres/`, {
         withCredentials: true
       })
       // Filtrer uniquement les oeuvres de l'utilisateur connecté
@@ -88,7 +88,7 @@ const MesOeuvres = () => {
     setConfirmModal({ show: false, oeuvreId: null })
 
     try {
-      await axios.delete(`${API_BASE}oeuvres/${id}/`, {
+      await axios.delete(`${API_BASE}/oeuvres/${id}/`, {
         withCredentials: true
       })
       setOeuvres(oeuvres.filter(oeuvre => oeuvre.id !== id))
@@ -112,7 +112,7 @@ const MesOeuvres = () => {
     setPredictingId(oeuvre.id)
     try {
       const response = await axios.post(
-        `${API_BASE}oeuvres/${oeuvre.id}/predict_popularity/`,
+        `${API_BASE}/oeuvres/${oeuvre.id}/predict_popularity/`,
         {},
         { withCredentials: true }
       )

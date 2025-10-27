@@ -25,7 +25,7 @@ const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
   const fetchGaleries = async () => {
     try {
-      const response = await axios.get(`${API_BASE}galeries/`, {
+      const response = await axios.get(`${API_BASE}/galeries/`, {
         withCredentials: true
       })
       // Filtrer uniquement les galeries publiques

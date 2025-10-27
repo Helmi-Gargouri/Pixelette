@@ -65,7 +65,7 @@ const GestionInteractions = () => {
       });
 
       const response = await axios.get(
-        `${API_BASE}interactions/?${params}`,
+        `${API_BASE}/interactions/?${params}`,
         {
           headers: { Authorization: `Token ${token}` },
           withCredentials: true
@@ -88,7 +88,7 @@ const GestionInteractions = () => {
     try {
       const token = localStorage.getItem('token');
       const response = await axios.get(
-        `${API_BASE}interactions/statistics/`,
+        `${API_BASE}/interactions/statistics/`,
         {
           headers: { Authorization: `Token ${token}` },
           withCredentials: true
@@ -104,7 +104,7 @@ const GestionInteractions = () => {
     if (!window.confirm('Supprimer cette interaction ?')) return;
     try {
       const token = localStorage.getItem('token');
-      await axios.delete(`${API_BASE}interactions/${id}/`, {
+      await axios.delete(`${API_BASE}/interactions/${id}/`, {
         headers: { Authorization: `Token ${token}` },
         withCredentials: true
       });
@@ -126,7 +126,7 @@ const GestionInteractions = () => {
     
     try {
       const token = localStorage.getItem('token');
-      await axios.delete(`${API_BASE}interactions/bulk_delete/`, {
+      await axios.delete(`${API_BASE}/interactions/bulk_delete/`, {
         data: { ids: selectedItems },
         headers: { Authorization: `Token ${token}` },
         withCredentials: true

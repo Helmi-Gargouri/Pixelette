@@ -35,8 +35,8 @@ const Index = () => {
   const fetchData = async () => {
     try {
       const [oeuvresRes, galeriesRes] = await Promise.all([
-        axios.get(`${API_BASE}oeuvres/`, { withCredentials: true }),
-        axios.get(`${API_BASE}galeries/`, { withCredentials: true })
+        axios.get(`${API_BASE}/oeuvres/`, { withCredentials: true }),
+        axios.get(`${API_BASE}/galeries/`, { withCredentials: true })
       ]);
       
       setOeuvres(oeuvresRes.data);
@@ -64,7 +64,7 @@ const Index = () => {
     setGeneratingReport(true);
     try {
       const res = await axios.post(
-        `${API_BASE}reports/summary/`,
+        `${API_BASE}/reports/summary/`,
         { download: true },
         { withCredentials: true, responseType: 'blob' }
       );
@@ -114,7 +114,7 @@ const Index = () => {
     if (!aiPrompt.trim()) return alert('Entrez une description en français de ce que vous souhaitez.');
     setAiLoading(true);
     try {
-      const res = await axios.post(`${API_BASE}ai/generate-chart/`, { prompt: aiPrompt }, { withCredentials: true })
+      const res = await axios.post(`${API_BASE}/ai/generate-chart/`, { prompt: aiPrompt }, { withCredentials: true })
       if (res.data?.success) {
         setAiResult(res.data)
       } else {
@@ -152,7 +152,7 @@ const Index = () => {
     try {
       const token = localStorage.getItem('token') || sessionStorage.getItem('token')
       const headers = token ? { Authorization: `Token ${token}` } : {}
-      await axios.post(`${API_BASE}saved-stats/`, payload, { withCredentials: true, headers })
+      await axios.post(`${API_BASE}/saved-stats/`, payload, { withCredentials: true, headers })
       alert('Widget sauvegardé !')
       // refresh the saved stats list by bumping the key
       setStatsRefreshKey(k => k + 1)

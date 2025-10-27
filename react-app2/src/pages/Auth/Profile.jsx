@@ -81,7 +81,7 @@ useEffect(() => {
     const storeTempAndRedirect = async () => {
       try {
         const storeResponse = await axios.post(
-          `${API_BASE}auth/store_temp/`,
+          `${API_BASE}/auth/store_temp/`,
           {
             token: token,
             user: user,
@@ -272,14 +272,14 @@ const getScoreColor = (percentage) => {
       
       // Seuls les admins peuvent accéder à /api/demandes/
       if (user.role === 'admin') {
-        const res = await axios.get(`${API_BASE}demandes/`, {
+        const res = await axios.get(`${API_BASE}/demandes/`, {
           withCredentials: true
         });
         const pending = res.data.some(d => d.statut === 'pending' && d.utilisateur_nom === `${user.prenom} ${user.nom}`);
         setHasPendingRequest(pending);
       } else {
         // Pour les non-admin, vérifier s'ils ont une demande en cours
-        const res = await axios.get(`${API_BASE}demandes/?utilisateur=${user.id}`, {
+        const res = await axios.get(`${API_BASE}/demandes/?utilisateur=${user.id}`, {
           withCredentials: true
         });
         const pending = res.data.some(d => d.statut === 'pending');
@@ -396,7 +396,7 @@ const imageUrl = response.data.image.startsWith('http')
         return;
       }
       
-      const response = await axios.post(`${API_BASE}demandes/`, {
+      const response = await axios.post(`${API_BASE}/demandes/`, {
         nouveau_role: 'artiste',
         raison: raison || ''  
       }, {

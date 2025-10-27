@@ -39,7 +39,7 @@ const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
   const fetchGaleries = async () => {
     try {
-      const response = await axios.get(`${API_BASE}galeries/`, {
+      const response = await axios.get(`${API_BASE}/galeries/`, {
         withCredentials: true
       })
       // Filtrer uniquement les galeries de l'utilisateur connecté
@@ -57,7 +57,7 @@ const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
   const fetchClusters = async () => {
     setClustersLoading(true)
     try {
-      const response = await axios.get(`${API_BASE}galeries/clusters/`, {
+      const response = await axios.get(`${API_BASE}/galeries/clusters/`, {
         withCredentials: true,
         params: { num_clusters: 5, my: 'true' }  // 'my=true' pour clusters personnels
       })
@@ -129,7 +129,7 @@ const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
     setConfirmModal({ show: false, galerieId: null })
 
     try {
-      await axios.delete(`${API_BASE}galeries/${id}/`, {
+      await axios.delete(`${API_BASE}/galeries/${id}/`, {
         withCredentials: true
       })
       setGaleries(galeries.filter(galerie => galerie.id !== id))
@@ -318,7 +318,7 @@ const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
   const handleGaleriePredict = async (galerie) => {
     try {
-      const resp = await axios.post(`${API_BASE}galeries/${galerie.id}/predict_popularity/`, {}, { withCredentials: true })
+      const resp = await axios.post(`${API_BASE}/galeries/${galerie.id}/predict_popularity/`, {}, { withCredentials: true })
       setPredictionModal({ show: true, galerie, data: resp.data })
     } catch (err) {
       setModal({ show: true, title: 'Erreur', message: 'Impossible de prédire la popularité pour cette galerie', type: 'error' })

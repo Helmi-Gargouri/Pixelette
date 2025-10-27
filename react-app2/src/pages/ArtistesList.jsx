@@ -98,7 +98,7 @@ const ArtistesList = () => {
 
       if (isFollowing) {
         // Ne plus suivre
-        await axios.delete(`${API_BASE}suivis/${artisteId}/unfollow/`, {
+        await axios.delete(`${API_BASE}/suivis/${artisteId}/unfollow/`, {
           withCredentials: true
         })
         
@@ -122,7 +122,7 @@ const ArtistesList = () => {
 
       } else {
         // Suivre
-        await axios.post(`${API_BASE}suivis/`, {
+        await axios.post(`${API_BASE}/suivis/`, {
           artiste_id: artisteId
         }, {
           withCredentials: true
@@ -181,7 +181,7 @@ const ArtistesList = () => {
     setSendingContact(true)
     
     try {
-      await axios.post(`${API_BASE}contacts/`, {
+      await axios.post(`${API_BASE}/contacts/`, {
         artiste_id: selectedArtiste.id,
         sujet: contactSubject,
         message: contactMessage

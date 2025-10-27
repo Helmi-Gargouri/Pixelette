@@ -84,7 +84,7 @@ const MEDIA_BASE = import.meta.env.VITE_MEDIA_URL || 'http://localhost:8000';
   useEffect(() => {
     fetchOeuvre()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-     axios.post(`${API_BASE}consultations/`, { 
+     axios.post(`${API_BASE}/consultations/`, { 
       oeuvre_id: id 
     }, { withCredentials: true }).catch(() => {})
   }, [id])
@@ -109,7 +109,7 @@ const MEDIA_BASE = import.meta.env.VITE_MEDIA_URL || 'http://localhost:8000';
 
   const fetchOeuvre = async () => {
     try {
-      const response = await axios.get(`${API_BASE}oeuvres/${id}/`, {
+      const response = await axios.get(`${API_BASE}/oeuvres/${id}/`, {
         withCredentials: true
       })
       setOeuvre(response.data)
@@ -137,7 +137,7 @@ const MEDIA_BASE = import.meta.env.VITE_MEDIA_URL || 'http://localhost:8000';
       setLoadingInteractions(prev => ({ ...prev, stats: true }))
       
       const response = await axios.get(
-        `${API_BASE}interactions/stats_by_oeuvre/?oeuvre=${id}`,
+        `${API_BASE}/interactions/stats_by_oeuvre/?oeuvre=${id}`,
         { withCredentials: true }
       )
       
@@ -165,7 +165,7 @@ const MEDIA_BASE = import.meta.env.VITE_MEDIA_URL || 'http://localhost:8000';
   const fetchAllComments = async () => {
     try {
       const response = await axios.get(
-        `${API_BASE}interactions/comments_with_replies/?oeuvre=${id}`,
+        `${API_BASE}/interactions/comments_with_replies/?oeuvre=${id}`,
         { withCredentials: true }
       )
       
@@ -180,7 +180,7 @@ const MEDIA_BASE = import.meta.env.VITE_MEDIA_URL || 'http://localhost:8000';
       // Fallback vers l'ancienne méthode si le nouvel endpoint n'est pas disponible
       try {
         const fallbackResponse = await axios.get(
-          `${API_BASE}interactions/?oeuvre=${id}&type=commentaire`,
+          `${API_BASE}/interactions/?oeuvre=${id}&type=commentaire`,
           { withCredentials: true }
         )
         
@@ -200,7 +200,7 @@ const MEDIA_BASE = import.meta.env.VITE_MEDIA_URL || 'http://localhost:8000';
   const fetchInteractionDetails = async () => {
     try {
       const response = await axios.get(
-        `${API_BASE}interactions/?oeuvre=${id}`,
+        `${API_BASE}/interactions/?oeuvre=${id}`,
         { withCredentials: true }
       )
       
@@ -242,7 +242,7 @@ const MEDIA_BASE = import.meta.env.VITE_MEDIA_URL || 'http://localhost:8000';
 
     try {
       const response = await axios.get(
-        `${API_BASE}interactions/?oeuvre=${id}&type=like`,
+        `${API_BASE}/interactions/?oeuvre=${id}&type=like`,
         { withCredentials: true }
       )
       
@@ -309,7 +309,7 @@ const MEDIA_BASE = import.meta.env.VITE_MEDIA_URL || 'http://localhost:8000';
     try {
       const response = await makeAuthenticatedRequest(
         'post',
-        `${API_BASE}interactions/reply_to_comment/`,
+        `${API_BASE}/interactions/reply_to_comment/`,
         {
           parent: replyingTo,
           oeuvre: id,
@@ -387,7 +387,7 @@ const MEDIA_BASE = import.meta.env.VITE_MEDIA_URL || 'http://localhost:8000';
       
       const response = await makeAuthenticatedRequest(
         'post',
-       `${API_BASE}oeuvres/${id}/generate_ai_comment/`,
+       `${API_BASE}/oeuvres/${id}/generate_ai_comment/`,
         {}
       )
 
@@ -459,7 +459,7 @@ const MEDIA_BASE = import.meta.env.VITE_MEDIA_URL || 'http://localhost:8000';
       
       const response = await makeAuthenticatedRequest(
         'post',
-        `${API_BASE}oeuvres/${id}/generate_multiple_ai_comments/`,
+        `${API_BASE}/oeuvres/${id}/generate_multiple_ai_comments/`,
         { count: 3 }
       )
 
@@ -503,7 +503,7 @@ const MEDIA_BASE = import.meta.env.VITE_MEDIA_URL || 'http://localhost:8000';
       
       const response = await makeAuthenticatedRequest(
         'post',
-        `${API_BASE}interactions/toggle_like/`,
+        `${API_BASE}/interactions/toggle_like/`,
         { oeuvre: parseInt(id) } // Convertir en entier
       )
 
@@ -560,7 +560,7 @@ const MEDIA_BASE = import.meta.env.VITE_MEDIA_URL || 'http://localhost:8000';
       
       await makeAuthenticatedRequest(
         'post',
-       `${API_BASE}interactions/`,
+       `${API_BASE}/interactions/`,
         {
           type: 'commentaire',
           oeuvre: parseInt(id), // Convertir en entier
@@ -631,7 +631,7 @@ const MEDIA_BASE = import.meta.env.VITE_MEDIA_URL || 'http://localhost:8000';
     setConfirmModal(false)
 
     try {
-      await axios.delete(`${API_BASE}oeuvres/${id}/`, {
+      await axios.delete(`${API_BASE}/oeuvres/${id}/`, {
         withCredentials: true
       })
       setModal({ 
@@ -705,7 +705,7 @@ const MEDIA_BASE = import.meta.env.VITE_MEDIA_URL || 'http://localhost:8000';
       try {
         await makeAuthenticatedRequest(
           'post',
-          `${API_BASE}interactions/`,
+          `${API_BASE}/interactions/`,
           {
             type: 'partage',
             oeuvre: parseInt(id), // Convertir en entier

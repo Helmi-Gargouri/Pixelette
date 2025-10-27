@@ -22,14 +22,14 @@ const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
   const fetchData = async () => {
     try {
       // Fetch galerie
-      const galerieResponse = await axios.get(`${API_BASE}galeries/${id}/`, {
+      const galerieResponse = await axios.get(`${API_BASE}/galeries/${id}/`, {
         withCredentials: true
       })
       setGalerie(galerieResponse.data)
       setOeuvresSelectionnees(galerieResponse.data.oeuvres || [])
 
       // Fetch toutes les oeuvres de l'utilisateur
-      const oeuvresResponse = await axios.get(`${API_BASE}oeuvres/`, {
+      const oeuvresResponse = await axios.get(`${API_BASE}/oeuvres/`, {
         withCredentials: true
       })
       
@@ -65,7 +65,7 @@ const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
     
     try {
       const token = localStorage.getItem('token')
-      await axios.patch(`${API_BASE}galeries/${id}/`, 
+      await axios.patch(`${API_BASE}/galeries/${id}/`, 
         {
           oeuvres: oeuvresSelectionnees
         },

@@ -37,7 +37,7 @@ const GalerieListTable = () => {
   const fetchGaleries = async () => {
     try {
 
-       const response = await axios.get(`${API_BASE}galeries/`, {
+       const response = await axios.get(`${API_BASE}/galeries/`, {
         withCredentials: true
       });
       setGaleries(response.data);
@@ -57,7 +57,7 @@ const GalerieListTable = () => {
     if (!selectedGalerie) return;
 
     try {
-      await axios.delete(`${API_BASE}galeries/${selectedGalerie.id}/`, {
+      await axios.delete(`${API_BASE}/galeries/${selectedGalerie.id}/`, {
         withCredentials: true
       });
       setGaleries(galeries.filter(g => g.id !== selectedGalerie.id));
@@ -72,7 +72,7 @@ const GalerieListTable = () => {
   const handleViewDetails = async (galerie) => {
     // Charger les détails complets avec les œuvres
     try {
-      const response = await axios.get(`${API_BASE}galeries/${galerie.id}/`, {
+      const response = await axios.get(`${API_BASE}/galeries/${galerie.id}/`, {
         withCredentials: true
       });
       setSelectedGalerie(response.data);
@@ -95,7 +95,7 @@ const GalerieListTable = () => {
       const galeriesWithDetails = await Promise.all(
         filteredGaleries.map(async (galerie) => {
           try {
-            const response = await axios.get(`${API_BASE}galeries/${galerie.id}/`, {
+            const response = await axios.get(`${API_BASE}/galeries/${galerie.id}/`, {
               withCredentials: true
             });
             return response.data;

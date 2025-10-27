@@ -16,7 +16,7 @@ const StatCard = ({ stat, onRefresh }) => {
   const handleDayClick = async (info) => {
     const ds = info.date.toISOString().slice(0,10)
     try {
-      const res = await axios.get(`${API_BASE}users/by-date/?date=${ds}`, { withCredentials: true })
+      const res = await axios.get(`${API_BASE}/users/by-date/?date=${ds}`, { withCredentials: true })
       if (res.data && !res.data.error) {
         setPopover({ open: true, date: ds, users: res.data.users, x: info.jsEvent?.clientX || 0, y: info.jsEvent?.clientY || 0 })
       }
@@ -28,7 +28,7 @@ const StatCard = ({ stat, onRefresh }) => {
   const fetchCompute = async () => {
     setLoading(true)
     try {
-      const res = await axios.get(`${API_BASE}saved-stats/${stat.id}/compute/`, { withCredentials: true })
+      const res = await axios.get(`${API_BASE}/saved-stats/${stat.id}/compute/`, { withCredentials: true })
       if (res.data && res.data.error) {
         setData({ error: res.data.error, detail: res.data.detail })
       } else {
@@ -50,7 +50,7 @@ const StatCard = ({ stat, onRefresh }) => {
   const handleDelete = async () => {
     if (window.confirm('Êtes-vous sûr de vouloir supprimer ce widget ?')) {
       try {
-        await axios.delete(`${API_BASE}saved-stats/${stat.id}/`, { withCredentials: true })
+        await axios.delete(`${API_BASE}/saved-stats/${stat.id}/`, { withCredentials: true })
         onRefresh && onRefresh()
       } catch (err) {
         console.error('delete', err)
@@ -257,7 +257,7 @@ const StatCard = ({ stat, onRefresh }) => {
         const start = arg.startStr.slice(0,10)
         const end = arg.endStr.slice(0,10)
         if (lastRangeRef.current.start === start && lastRangeRef.current.end === end) return
-        const res = await axios.get(`${API_BASE}saved-stats/${stat.id}/compute/?start=${start}&end=${end}`, { withCredentials: true })
+        const res = await axios.get(`${API_BASE}/saved-stats/${stat.id}/compute/?start=${start}&end=${end}`, { withCredentials: true })
         if (res.data && !res.data.error) {
           const newPoints = res.data.points || []
           setLocalPoints(newPoints)
@@ -698,7 +698,7 @@ const SavedStatsList = ({ onCreated, refreshKey }) => {
     try {
       const token = localStorage.getItem('token') || sessionStorage.getItem('token')
       const headers = token ? { Authorization: `Token ${token}` } : {}
-      const res = await axios.get(`${API_BASE}saved-stats/`, { withCredentials: true, headers })
+      const res = await axios.get(`${API_BASE}/saved-stats/`, { withCredentials: true, headers })
       setStats(res.data)
     } catch (err) {
       console.error('fetch stats', err)

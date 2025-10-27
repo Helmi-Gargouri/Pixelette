@@ -33,7 +33,7 @@ const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
   const fetchGalerie = async () => {
     try {
-      const response = await axios.get(`${API_BASE}galeries/${id}/`, {
+      const response = await axios.get(`${API_BASE}/galeries/${id}/`, {
         withCredentials: true
       })
       setGalerie(response.data)
@@ -64,7 +64,7 @@ const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
     setConfirmModal(false)
 
     try {
-      await axios.delete(`${API_BASE}galeries/${id}/`, {
+      await axios.delete(`${API_BASE}/galeries/${id}/`, {
         withCredentials: true
       })
       setModal({ 
@@ -98,7 +98,7 @@ const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
     try {
       const response = await axios.get(
-        `${API_BASE}galeries/${id}/generate_spotify_playlist/`,
+        `${API_BASE}/galeries/${id}/generate_spotify_playlist/`,
         { withCredentials: true }
       )
       
@@ -134,7 +134,7 @@ const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
     try {
       // Obtient l'URL d'autorisation Spotify
       const authResponse = await axios.get(
-        `${API_BASE}spotify/auth-url/?galerie_id=${id}`,
+        `${API_BASE}/spotify/auth-url/?galerie_id=${id}`,
         { withCredentials: true }
       )
 
@@ -182,7 +182,7 @@ const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
       setSpotifyModal({ show: true, playlist: null, loading: true, created: false })
       
       const response = await axios.post(
-       `${API_BASE}spotify/create-playlist/`,
+       `${API_BASE}/spotify/create-playlist/`,
         {
           access_token: accessToken,
           galerie_id: id,
@@ -218,7 +218,7 @@ const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
     try {
       const response = await axios.get(
-        `${API_BASE}galeries/${id}/palette/`,
+        `${API_BASE}/galeries/${id}/palette/`,
         { withCredentials: true }
       )
       

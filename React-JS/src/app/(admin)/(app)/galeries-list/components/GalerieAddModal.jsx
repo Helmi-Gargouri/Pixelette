@@ -24,7 +24,7 @@ const GalerieAddModal = ({ show, onClose, onSuccess }) => {
 
   const fetchAllOeuvres = async () => {
     try {
-      const response = await axios.get(`${API_BASE}oeuvres/`, {
+      const response = await axios.get(`${API_BASE}/oeuvres/`, {
         withCredentials: true
       });
 
@@ -70,7 +70,7 @@ const GalerieAddModal = ({ show, onClose, onSuccess }) => {
         oeuvres: selectedOeuvres  // Ajoute les œuvres sélectionnées
       };
 
-      await axios.post(`${API_BASE}galeries/`, submitData, {
+      await axios.post(`${API_BASE}/galeries/`, submitData, {
         withCredentials: true
       });
 

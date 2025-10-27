@@ -53,7 +53,7 @@ const DemandesRoles = () => {
       if (search) params.append('search', search);
       if (statutFilter) params.append('statut', statutFilter);
       const response = await axios.get(
-        `${API_BASE}demandes/?${params.toString()}`,
+        `${API_BASE}/demandes/?${params.toString()}`,
         {
           headers: { Authorization: `Token ${token}` },
           withCredentials: true
@@ -92,7 +92,7 @@ const DemandesRoles = () => {
     try {
       const token = localStorage.getItem('token');
       await axios.patch(
-        `${API_BASE}demandes/${id}/approuver/`,
+        `${API_BASE}/demandes/${id}/approuver/`,
         {},
         { headers: { Authorization: `Token ${token}` }, withCredentials: true }
       );
@@ -108,7 +108,7 @@ const DemandesRoles = () => {
     try {
       const token = localStorage.getItem('token');
       await axios.patch(
-        `${API_BASE}demandes/${id}/rejeter/`,
+        `${API_BASE}/demandes/${id}/rejeter/`,
         {},
         { headers: { Authorization: `Token ${token}` }, withCredentials: true }
       );

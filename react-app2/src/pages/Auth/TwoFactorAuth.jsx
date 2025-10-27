@@ -34,7 +34,7 @@ const BACKOFFICE_URL = import.meta.env.VITE_BACKOFFICE_URL || 'http://localhost:
                 const storeTempAndRedirect = async () => {
                   try {
                     const storeResponse = await axios.post(
-                      `${API_BASE}auth/store_temp/`,
+                      `${API_BASE}/auth/store_temp/`,
                       {
                         token: token,
                         user: userData,
@@ -217,7 +217,7 @@ const BACKOFFICE_URL = import.meta.env.VITE_BACKOFFICE_URL || 'http://localhost:
           // Stocker temporairement les données admin
           try {
             const storeResponse = await axios.post(
-              `${API_BASE}auth/store_temp/`,
+              `${API_BASE}/auth/store_temp/`,
               {
                 token: response.data.token,
                 user: response.data.user,

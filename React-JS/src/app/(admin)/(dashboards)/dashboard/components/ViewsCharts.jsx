@@ -321,7 +321,7 @@ function ArtistViewsPanel() {
         params.set('top', String(top))
         params.set('artists_only', artistsOnly ? 'true' : 'false')
         params.set('include_zero', includeZero ? 'true' : 'false')
-        const url = `${API_BASE}stats/views-by-artist/?${params.toString()}`
+        const url = `${API_BASE}/stats/views-by-artist/?${params.toString()}`
         const res = await axios.get(url, { withCredentials: true })
         if (!mounted) return
         if (res.data && Array.isArray(res.data.labels) && Array.isArray(res.data.values)) {

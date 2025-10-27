@@ -61,7 +61,7 @@ const SavedStatForm = ({ onCreated }) => {
       }
       const token = localStorage.getItem('token') || sessionStorage.getItem('token')
       const headers = token ? { Authorization: `Token ${token}` } : {}
-      const res = await axios.post(`${API_BASE}saved-stats/`, payload, { withCredentials: true, headers })
+      const res = await axios.post(`${API_BASE}/saved-stats/`, payload, { withCredentials: true, headers })
       onCreated && onCreated(res.data)
       setTitle('')
       setChartType('pie')

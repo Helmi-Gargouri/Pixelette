@@ -51,7 +51,7 @@ const OeuvreEditModal = ({ show, onClose, oeuvre, onSuccess }) => {
         submitData.append('image', formData.image);
       }
 
-      await axios.put(`${API_BASE}oeuvres/${oeuvre.id}/`, submitData, {
+      await axios.put(`${API_BASE}/oeuvres/${oeuvre.id}/`, submitData, {
         withCredentials: true,
         headers: {
           'Content-Type': 'multipart/form-data'

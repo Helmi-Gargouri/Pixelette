@@ -19,7 +19,7 @@ const fetchRecommendations = async () => {
   try {
     const token = localStorage.getItem('token')
     const response = await axios.get(
-      `${API_BASE}oeuvres/recommendations/`,
+      `${API_BASE}/oeuvres/recommendations/`,
       {
         headers: { Authorization: `Token ${token}` },
         withCredentials: true

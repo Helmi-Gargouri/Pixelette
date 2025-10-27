@@ -27,7 +27,7 @@ const MEDIA_BASE = import.meta.env.VITE_MEDIA_URL || 'http://localhost:8000';
   const fetchAllOeuvres = async () => {
     try {
       const token = localStorage.getItem('token')
-      const response = await axios.get(`${API_BASE}oeuvres/`, {
+      const response = await axios.get(`${API_BASE}/oeuvres/`, {
         withCredentials: true,
         headers: {
           Authorization: `Token ${token}`
@@ -86,7 +86,7 @@ const MEDIA_BASE = import.meta.env.VITE_MEDIA_URL || 'http://localhost:8000';
     
     try {
       const token = localStorage.getItem('token')
-      await axios.post(`${API_BASE}galeries/`, 
+      await axios.post(`${API_BASE}/galeries/`, 
         {
           ...formData,
           proprietaire: user.id,

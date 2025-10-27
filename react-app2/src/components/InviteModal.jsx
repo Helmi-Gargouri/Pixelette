@@ -51,7 +51,7 @@ const InviteModal = ({ show, onClose, galerieId, galerieName }) => {
     setSending(true)
     try {
       await axios.post(
-        `${API_BASE}galeries/${galerieId}/invite/`,
+        `${API_BASE}/galeries/${galerieId}/invite/`,
         { user_id: selectedUser.id },
         { withCredentials: true }
       )

@@ -20,7 +20,7 @@ const MEDIA_BASE = import.meta.env.VITE_MEDIA_URL || 'http://localhost:8000';
 
   const fetchOeuvres = async () => {
     try {
-      const response = await axios.get(`${API_BASE}oeuvres/`, {
+      const response = await axios.get(`${API_BASE}/oeuvres/`, {
         withCredentials: true
       })
       // Afficher toutes les oeuvres (elles sont toutes publiques)
@@ -87,7 +87,7 @@ const MEDIA_BASE = import.meta.env.VITE_MEDIA_URL || 'http://localhost:8000';
     event.stopPropagation()
     
     if (platform !== 'copy') {
-    axios.post(`${API_BASE}partages/`, { 
+    axios.post(`${API_BASE}/partages/`, { 
       oeuvre_id: oeuvre.id, 
       plateforme: platform 
     }, { withCredentials: true }).catch(() => {})

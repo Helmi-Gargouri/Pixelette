@@ -49,7 +49,7 @@ const OeuvreAIGenerator = () => {
       const selectedStyle = styles.find(s => s.value === style)
       
       const response = await axios.post(
-        `${API_BASE}oeuvres/generate_ai_image/`,
+        `${API_BASE}/oeuvres/generate_ai_image/`,
         {
           prompt: prompt,
           style: selectedStyle?.description || ''

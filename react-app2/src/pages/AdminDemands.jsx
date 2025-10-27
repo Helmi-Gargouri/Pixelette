@@ -46,7 +46,7 @@ const AdminDemands = () => {
 
   const fetchDemandes = async (token) => {
     try {
-      const response = await axios.get(`${API_BASE}demandes/`, {
+      const response = await axios.get(`${API_BASE}/demandes/`, {
         headers: { Authorization: `Token ${token}` },
         withCredentials: true
       });
@@ -90,7 +90,7 @@ const AdminDemands = () => {
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.patch(`${API_BASE}demandes/${id}/approuver/`, {}, {
+      const response = await axios.patch(`${API_BASE}/demandes/${id}/approuver/`, {}, {
         headers: { Authorization: `Token ${token}` },
         withCredentials: true
       });
@@ -107,7 +107,7 @@ const AdminDemands = () => {
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.patch(`${API_BASE}demandes/${id}/rejeter/`, {}, {
+      const response = await axios.patch(`${API_BASE}/demandes/${id}/rejeter/`, {}, {
         headers: { Authorization: `Token ${token}` },
         withCredentials: true
       });

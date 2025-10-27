@@ -43,7 +43,7 @@ export const AuthProvider = ({ children }) => {
 
       if (tempId && !token) {
         console.log('✅ Temp ID trouvé dans l\'URL, récupération des données auth...');
-        const response = await axios.get(`${API_BASE}auth/get_temp/${tempId}/`, {
+        const response = await axios.get(`${API_BASE}/auth/get_temp/${tempId}/`, {
           headers: { 'Content-Type': 'application/json' },
         });
         console.log('📌 Réponse API Get Temp:', response.data);

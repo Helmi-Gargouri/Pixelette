@@ -519,4 +519,4 @@ def handle_role_change(sender, instance, created, raw, update_fields, **kwargs):
                 subject = f'Rôle Mis à Jour (de {old_role} à {new_role})'
                 message = f'Bonjour {instance.prenom}, votre rôle a été mis à jour en User standard.\n\nSi vous voulez devenir artiste, demandez-le via votre profil.'
             
-            send_mail(subject, message, 'no-reply@pixelette.com', [instance.email])
+        send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [instance.email])
