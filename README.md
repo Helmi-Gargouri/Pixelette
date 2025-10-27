@@ -120,17 +120,9 @@ MONGO_URI=mongodb://localhost:27017/pixelette
 MONGO_DB_NAME=pixelette
 ```
 
-### 5. Configurer Redis
-
-```bash
-docker run -d -p 6379:6379 --name pixelette-redis redis:7-alpine
-
-# Ou localement
-# Ubuntu: sudo apt install redis-server
-# macOS: brew install redis
 ```
 
-### 6. Exécuter les Migrations
+### 5. Exécuter les Migrations
 
 ```bash
 cd backend
@@ -143,7 +135,7 @@ python manage.py loaddata fixtures/initial_data.json
 python manage.py createsuperuser
 ```
 
-### 7. Compiler les Assets
+### 6. Compiler les Assets
 
 ```bash
 cd frontend
@@ -343,11 +335,6 @@ GET /api/artworks/
 Authorization: Bearer {jwt_token}
 ```
 
-## 📄 Licence
-
-Ce projet est sous licence **MIT**. Vous êtes libre de l'utiliser, le modifier et le distribuer.
-
-Voir le fichier [LICENSE](LICENSE) pour plus de détails.
 
 ## 📞 Contact
 
