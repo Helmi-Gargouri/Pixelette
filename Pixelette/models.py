@@ -501,7 +501,7 @@ def handle_role_change(sender, instance, created, raw, update_fields, **kwargs):
         else:  # 'user' ou autre
             subject = 'Bienvenue sur Pixelette !'
             message = f'Bonjour {instance.prenom}, votre compte a été créé. Explorez la galerie et demandez à devenir artiste si vous le souhaitez.\n\nConnectez-vous pour commencer.'
-        send_mail(subject, message, 'no-reply@pixelette.com', [instance.email])
+        send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [instance.email])
         return
 
     if update_fields and 'role' in update_fields:
