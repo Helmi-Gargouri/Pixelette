@@ -1,19 +1,21 @@
-// src/config/axiosConfig.js
-// Créer ce fichier dans : frontoffice/src/config/axiosConfig.js
-
+// frontoffice/src/config/axiosConfig.js
 import axios from 'axios';
 
-const BASE_URL = import.meta.env.VITE_BASE_URL || 'http://localhost:8000';
+// ✅ Utiliser VITE_API_URL au lieu de VITE_BASE_URL
+const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+
+console.log('🌐 Axios Base URL:', BASE_URL);
 
 // Configuration de base
 axios.defaults.baseURL = BASE_URL;
 axios.defaults.withCredentials = true;
+axios.defaults.headers.common['Content-Type'] = 'application/json';
 
 // Intercepteur pour ajouter automatiquement le token
 axios.interceptors.request.use(
   (config) => {
-    // ✅ NE PAS ajouter le token pour les routes publiques
-    const publicRoutes = ['/api/utilisateurs/login/', '/api/utilisateurs/register/', '/api/auth/'];
+    // ✅ Routes publiques (pas besoin de token)
+    const publicRoutes = ['/utilisateurs/login/', '/utilisateurs/register/', '/auth/'];
     const isPublicRoute = publicRoutes.some(route => config.url?.includes(route));
     
     if (isPublicRoute) {
@@ -21,15 +23,15 @@ axios.interceptors.request.use(
       return config;
     }
     
+    // ✅ Récupérer le token depuis localStorage
     const token = localStorage.getItem('token');
     
     if (token) {
-      // Ajouter le token dans les headers
       config.headers.Authorization = `Token ${token}`;
       console.log('📤 Requête avec token:', {
         url: config.url,
         method: config.method,
-        token: token.substring(0, 10) + '...'
+        hasToken: true
       });
     } else {
       console.warn('⚠️ Pas de token pour:', config.url);
@@ -43,31 +45,51 @@ axios.interceptors.request.use(
   }
 );
 
-// Intercepteur pour gérer les erreurs 403
+// Intercepteur pour gérer les erreurs de réponse
 axios.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    console.log('✅ Réponse reçue:', {
+      url: response.config.url,
+      status: response.status
+    });
+    return response;
+  },
   (error) => {
-    if (error.response?.status === 403) {
-      console.error('🔒 403 Forbidden:', {
-        url: error.config?.url,
-        method: error.config?.method,
-        data: error.response?.data
-      });
-      
-      // ✅ NE PAS rediriger automatiquement
-      // Laisser le composant gérer l'erreur
-      console.log('⚠️ Erreur 403 - Laisser le composant gérer');
-    }
+    const status = error.response?.status;
+    const url = error.config?.url;
     
-    // ✅ Si erreur 401 (Unauthorized), déconnecter
-    if (error.response?.status === 401) {
-      const isLoginRoute = error.config?.url?.includes('/login/');
+    console.error('❌ Erreur réponse:', {
+      status,
+      url,
+      message: error.response?.data
+    });
+    
+    // ✅ 401 Unauthorized - Token invalide ou expiré
+    if (status === 401) {
+      const isLoginRoute = url?.includes('/login/');
       if (!isLoginRoute) {
-        console.log('🚪 401 Unauthorized - Déconnexion');
+        console.log('🚪 401 Unauthorized - Déconnexion automatique');
         localStorage.removeItem('token');
         localStorage.removeItem('user');
         window.location.href = '/login';
       }
+    }
+    
+    // ✅ 403 Forbidden - Permissions insuffisantes
+    if (status === 403) {
+      console.error('🔒 403 Forbidden:', {
+        url,
+        data: error.response?.data
+      });
+    }
+    
+    // ✅ 500 Server Error
+    if (status >= 500) {
+      console.error('🔥 Erreur serveur:', {
+        status,
+        url,
+        message: error.response?.data
+      });
     }
     
     return Promise.reject(error);
