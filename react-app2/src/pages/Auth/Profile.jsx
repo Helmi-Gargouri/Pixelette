@@ -295,7 +295,7 @@ const getScoreColor = (percentage) => {
     const file = e.target.files[0];
     if (file) {
       if (isLocalPreview && imagePreview) {
-        try { URL.revokeObjectURL(imagePreview); } catch (err) {}
+        URL.revokeObjectURL(imagePreview); // Remove try-catch if errors are not expected
       }
       setSelectedImage(file);
       const previewUrl = URL.createObjectURL(file);

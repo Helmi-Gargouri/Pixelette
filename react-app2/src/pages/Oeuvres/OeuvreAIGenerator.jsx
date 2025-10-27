@@ -166,8 +166,9 @@ const OeuvreAIGenerator = () => {
     link.download = `ai-generated-${Date.now()}.png`
     document.body.appendChild(link)
     link.click()
-    document.body.removeChild(link)
-  }
+if (link.parentNode === document.body) {
+  document.body.removeChild(link);
+}  }
 
   const handleAddOeuvre = () => {
     setShowForm(true)

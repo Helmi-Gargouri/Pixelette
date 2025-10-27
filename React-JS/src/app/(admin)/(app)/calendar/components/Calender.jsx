@@ -51,9 +51,15 @@ const CalendarApp = () => {
       },
       drop: info => {
         const checkbox = document.getElementById('drop-remove');
-        if (checkbox?.checked) {
-          info.draggedEl.parentNode?.removeChild(info.draggedEl);
-        }
+  // Pour le drag & drop
+if (checkbox?.checked) {
+  // CORRECTION :
+  setTimeout(() => {
+    if (info.draggedEl.parentNode) {
+      info.draggedEl.parentNode.removeChild(info.draggedEl);
+    }
+  }, 0);
+}
       }
     });
     calendar.render();

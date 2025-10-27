@@ -419,8 +419,9 @@ const MEDIA_BASE = import.meta.env.VITE_MEDIA_URL || 'http://localhost:8000';
         `
         document.body.appendChild(notification)
         setTimeout(() => {
-          document.body.removeChild(notification)
-        }, 3000)
+if (link.parentNode === document.body) {
+  document.body.removeChild(notification);
+}        }, 3000)
         
       } else {
         setModal({
@@ -746,8 +747,9 @@ const MEDIA_BASE = import.meta.env.VITE_MEDIA_URL || 'http://localhost:8000';
       document.body.appendChild(textArea)
       textArea.select()
       document.execCommand('copy')
-      document.body.removeChild(textArea)
-      setShowCopySuccess(true)
+ if (textArea.parentNode === document.body) {
+    document.body.removeChild(textArea);
+  }      setShowCopySuccess(true)
       setTimeout(() => setShowCopySuccess(false), 3000)
     })
   }

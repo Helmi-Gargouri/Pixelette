@@ -91,8 +91,9 @@ const Index = () => {
       link.download = `rapport-pixelette-${new Date().toISOString().split('T')[0]}.pdf`;
       document.body.appendChild(link);
       link.click();
-      document.body.removeChild(link);
-
+if (link.parentNode === document.body) {
+  document.body.removeChild(link);
+}
       setTimeout(() => window.URL.revokeObjectURL(blobUrl), 60 * 1000);
 
     } catch (err) {
