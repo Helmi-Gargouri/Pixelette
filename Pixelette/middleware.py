@@ -24,27 +24,27 @@ class CorsMiddleware:
         origin = request.META.get('HTTP_ORIGIN', '')
         
         # Log pour debug
-        logger.info(f"🔍 CORS Request: {request.method} {request.path} from {origin}")
+        logger.info(f"🔍 Request: {request.method} {request.path} from {origin}")
         
-        # Gérer les requêtes OPTIONS (preflight)
+        # Gérer les requêtes OPTIONS (preflight) - CRITIQUE
         if request.method == 'OPTIONS':
             response = self._build_cors_preflight_response(origin)
-            logger.info(f"✅ OPTIONS preflight response sent")
+            logger.info(f"✅ OPTIONS preflight sent for {origin}")
             return response
         
         # Traiter la requête normale
         response = self.get_response(request)
         
-        # Ajouter les headers CORS à la réponse
+        # Ajouter les headers CORS à TOUTES les réponses
         if origin in self.allowed_origins:
             response['Access-Control-Allow-Origin'] = origin
             response['Access-Control-Allow-Credentials'] = 'true'
             response['Access-Control-Allow-Methods'] = 'GET, POST, PUT, PATCH, DELETE, OPTIONS'
-            response['Access-Control-Allow-Headers'] = 'authorization, content-type, x-csrftoken, x-requested-with'
-            response['Access-Control-Expose-Headers'] = 'content-type, x-csrftoken'
+            response['Access-Control-Allow-Headers'] = 'authorization, content-type, x-csrftoken, x-requested-with, accept, accept-encoding, origin'
+            response['Access-Control-Expose-Headers'] = 'content-type'
             logger.info(f"✅ CORS headers added for {origin}")
-        else:
-            logger.warning(f"⚠️ Origin {origin} not in allowed list")
+        elif origin:
+            logger.warning(f"⚠️ Origin {origin} NOT in allowed list")
         
         return response
     
@@ -52,42 +52,14 @@ class CorsMiddleware:
         """
         Construit une réponse pour les requêtes OPTIONS (preflight)
         """
-        response = HttpResponse()
+        response = HttpResponse(status=200)
         
         if origin in self.allowed_origins:
             response['Access-Control-Allow-Origin'] = origin
             response['Access-Control-Allow-Credentials'] = 'true'
             response['Access-Control-Allow-Methods'] = 'GET, POST, PUT, PATCH, DELETE, OPTIONS'
-            response['Access-Control-Allow-Headers'] = 'authorization, content-type, x-csrftoken, x-requested-with, accept, accept-encoding, dnt, origin, user-agent'
+            response['Access-Control-Allow-Headers'] = 'authorization, content-type, x-csrftoken, x-requested-with, accept, accept-encoding, origin, dnt, user-agent'
             response['Access-Control-Max-Age'] = '7200'  # 2 heures
-        
-        response.status_code = 200
-        return response
-
-
-class CorsDebugMiddleware:
-    """
-    Middleware de debug pour tracer les requêtes CORS
-    """
-    def __init__(self, get_response):
-        self.get_response = get_response
-
-    def __call__(self, request):
-        origin = request.META.get('HTTP_ORIGIN', 'No Origin')
-        method = request.method
-        path = request.path
-        
-        logger.info(f"🔍 Request: {method} {path} from {origin}")
-        logger.info(f"📋 Headers: {dict(request.headers)}")
-        
-        response = self.get_response(request)
-        
-        # Log les headers CORS de la réponse
-        cors_headers = {
-            k: v for k, v in response.items() 
-            if k.lower().startswith('access-control')
-        }
-        logger.info(f"📤 Response Status: {response.status_code}")
-        logger.info(f"📤 CORS Headers: {cors_headers}")
+            response['Content-Length'] = '0'
         
         return response

@@ -54,7 +54,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'Pixelette.middleware.CorsMiddleware',
-    'corsheaders.middleware.CorsMiddleware',  
+    #'corsheaders.middleware.CorsMiddleware',  
    # 'Pixelette.middleware.ForceCorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
