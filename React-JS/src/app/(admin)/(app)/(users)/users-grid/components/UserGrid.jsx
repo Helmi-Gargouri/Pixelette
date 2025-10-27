@@ -71,7 +71,9 @@ const fetchUsers = async () => {
       throw new Error('Aucun token trouvé dans localStorage');
     }
 
-    const response = await axios.get(`http://localhost:8000/api/utilisateurs/`, {
+    //const response = await axios.get(`http://localhost:8000/api/utilisateurs/`, {
+    const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+    const response = await axios.get(`${API_BASE}/utilisateurs/`, {
       headers: {
         Authorization: `Token ${token}`,
         'Content-Type': 'application/json',

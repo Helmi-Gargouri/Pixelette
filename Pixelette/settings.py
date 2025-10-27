@@ -177,7 +177,8 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",  # Port Vite par défaut
     "http://127.0.0.1:5173",  # Alternative
     "http://localhost:5174",  # Port Backoffice par défaut
-    "http://127.0.0.1:5174"
+    "http://127.0.0.1:5174",
+    "https://Pixelette-backoffice.onrender.com",
 ]
 
 CORS_ALLOW_HEADERS = [
