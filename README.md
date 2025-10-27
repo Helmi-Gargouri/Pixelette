@@ -1,77 +1,342 @@
-# Pixelette
-Galerie d’Art Générative et Interactive
+# 🎨 Pixelette - Galerie d'Art Générative et Interactive
 
-1. Introduction et Problématique
-Imaginez un monde où votre imagination se transforme instantanément en œuvre d'art époustouflante, partagée et affinée par une communauté passionnée. C'est l'essence de notre "Galerie d’Art Générative et Interactive" – une app web qui fusionne créativité humaine et puissance de l'IA pour révolutionner l'art numérique !
-Mais voici le hic : les plateformes actuelles frustrent les artistes et amateurs. Génération d'art isolée sans outils interactifs, galeries statiques sans personnalisation, et communautés sans modération intelligente – tout cela freine l'innovation et l'engagement. 
-Comment démocratiser l'art IA pour qu'il soit accessible, immersif et sécurisé, sans ces barrières qui étouffent la créativité ?
+> Une plateforme révolutionnaire qui fusionne créativité humaine et puissance de l'IA pour transformer vos idées en œuvres d'art époustouflantes. Créez, partagez et explorez dans un musée virtuel immersif où chaque pixel raconte une histoire.
 
-2. Étude de Cas
-Pour illustrer ces limites, examinons deux concurrents principaux : Midjourney et ArtStation.
-Midjourney : 
-C'est un outil d'IA pour la génération d'art, accessible via Discord. 
-Forces : Il excelle dans la production d'images détaillées et artistiquement sophistiquées, avec une communauté forte et des algorithmes avancés pour la personnalisation.
- Faiblesses : Interface restrictive (limitée à Discord), manque de customisation fine et plus lent que les concurrents, sans gestion de galeries ou interactions sociales intégrées.
+## 🌟 Aperçu
 
-ArtStation : 
-Une plateforme pour portfolios d'artistes, axée sur le professionnel.
- Forces : Aspect professionnel avec opportunités d'emploi et une communauté interactive pour feedback et monétisation, incluant un marketplace et des outils d'apprentissage. 
-Faiblesses : Pas optimisé pour le reach ou la découverte (plus portfolio que galerie interactive), manque d'intégration IA pour génération d'art, et controverses sur l'IA             (ex. : stance sur l'entraînement de modèles).
-Ces cas montrent le besoin d'une solution unifiée combinant génération IA, galeries interactives et communauté.
+**Pixelette** est une galerie d'art générative et interactive qui révolutionne l'art numérique. Le nom "Pixelette" fusionne "pixel" (symbole de l'art numérique) et "palette" (évoquant la créativité sans limites), invitant chacun à plonger dans un univers onirique où chaque clic crée une œuvre unique. L'application combine des outils intuitifs de création avec des recommandations personnalisées alimentées par l'IA pour démocratiser l'art numérique.
 
-3. Solution proposée
-Pixelette : Ce nom vibrant capture l’essence de notre musée virtuel. Il fusionne "pixel", symbole de l’art numérique et interactif, avec "palette", évoquant les couleurs et la créativité sans limites. Invitant chacun à plonger dans un univers onirique où chaque clic crée une œuvre unique.
-Pixelette un nom vibrant fusionnant "pixel", symbole de l’art numérique, et "palette", évoquant la créativité sans limites, est une révolution pour les artistes et amateurs. Créez des œuvres d'art en un clic grâce à des prompts simples, organisez-les en galeries thématiques enrichies par l'IA, interagissez via likes et commentaires modérés, et découvrez des insights pour booster votre visibilité. Chaque étape est boostée par l'intelligence artificielle, rendant l'art accessible, personnalisé et captivant. Avec des fonctionnalités comme une visite 3D immersive (objectif bonus), cette app redéfinit l'expérience artistique numérique !
+**Développé par** : Une équipe de 5 étudiants passionnés en informatique  
+**Type** : Projet open-source hébergé sur GitHub
 
-4. Les Besoins Fonctionnels
-Gestion des Utilisateurs:
-CRUD
-Fonctionnalités supplémentaires : Recherche d'utilisateurs par nom/tags, système de suivi (follow/unfollow), envoi de notifications par email (ex. : quand quelqu'un suit ou like une œuvre).
-Partie IA : Recommandations personnalisées d'œuvres d'art basées sur les préférences de l'utilisateur 
- Utilité : Personnalise l'expérience en suggérant des œuvres alignées sur vos goûts, favorisant la découverte et l'engagement.
+## ✨ Fonctionnalités
 
-Gestion des Œuvres d'Art:
-CRUD
-Fonctionnalités supplémentaires : Upload d'images manuelles, ajout de métadonnées (tags, date), visualisation interactive (zoom, rotation via JS), partage sur réseaux sociaux.
-Partie IA : Génération automatique d'œuvres via IA (basée sur un prompt textuel)
-utilité : Démocratise la création artistique en transformant des idées textuelles en visuels instantanés, stimulant l'innovation sans compétences techniques.
+### 👤 Gestion des Utilisateurs
+- Système CRUD complet avec profils personnalisables
+- Recherche avancée d'utilisateurs par nom et tags
+- Système de suivi social (follow/unfollow)
+- Notifications par email pour les interactions
+- **IA : Recommandations personnalisées** d'œuvres basées sur vos préférences
 
-Gestion des Galeries:
-CRUD 
-Fonctionnalités supplémentaires : Permissions (publique/privée/invitations), recherche par tags/créateur, export PDF, visite virtuelle 3D (bonus via Three.js, non garanti).
-Partie IA : 
-Curation automatique : Clustering textuel des œuvres par similarité  
-Utilité : Organise intelligemment les collections en thèmes pour une navigation fluide tout en aidant les créateurs à mieux organiser leurs expositions.
-Analyse de palette de couleurs : Extraction des couleurs dominantes des images et suggestion d’harmonies 
-Utilité :Améliore la qualité esthétique des galeries en proposant des combinaisons visuellement harmonieuses. Les utilisateurs peuvent ainsi créer des collections équilibrées et attractives, ce qui valorise les œuvres et renforce l’expérience visuelle des visiteurs.
+### 🎨 Gestion des Œuvres d'Art
+- CRUD complet avec upload manuel d'images
+- Métadonnées enrichies (tags, descriptions, dates)
+- Visualisation interactive (zoom, rotation)
+- Partage direct sur réseaux sociaux
+- **IA : Génération automatique** d'œuvres via prompts textuels
 
-Gestion des Interactions:
-CRUD : 
-Fonctionnalités supplémentaires : Notifications temps réel (Django Channels), système de signalement utilisateur (signalement → validation admin), historique.
-Partie IA : Modération automatique des commentaires (détection de toxicité/spam), et suggestions d'interactions (ex. : prompts pour commentaires générés par IA) 
-Utilité : Assure une communauté saine en filtrant les contenus négatifs, tout en inspirant des échanges enrichissants via des suggestions créatives.
-Gestion des Statistiques et Insights:
-CRUD 
-Fonctionnalités supplémentaires : Génération de rapports PDF/CSV, monitoring (vues, utilisateurs actifs, graphs).
-Partie IA : Analyse prédictive de la popularité des œuvres 
-Utilité : Guide les créateurs en prévoyant l'impact de leurs œuvres, optimisant les stratégies pour maximiser la visibilité et l'engagement.
+### 🖼️ Gestion des Galeries
+- CRUD complet avec permissions (public/privé/sur invitation)
+- Recherche par tags, créateur et thème
+- Export de collections en PDF
+- Visite virtuelle 3D immersive (Three.js)
+- **IA : Curation automatique** par clustering thématique
+- **IA : Analyse de palette** pour harmonies de couleurs
 
-5. Besoins Non Fonctionnels
-Performance : Temps de génération IA inférieur à 10 secondes (optimisé avec GPU si disponible), support pour plus de 100 utilisateurs simultanés.
-Sécurité : Authentification JWT, authentification requise pour actions sensibles, modération IA et signalement pour contenus inappropriés.
-Usabilité : Interface intuitive et responsive (mobile/desktop), avec des visuels accessibles à tous.
-Scalabilité : Architecture modulaire pour extensions futures.
-Technologies Utilisées
-Pour donner vie à Pixelette,  nous avons sélectionné une stack technologique moderne alliant performance, interactivité et scalabilité.
-Frontend : 
-React.js 
-Three.js
-Backend :
-Django (Python) 
-Base de Données : 
-sql-lite
-Pourquoi ces choix ?
-React et Three.js offrent une expérience utilisateur moderne et immersive, Django assure un backend fiable et sécurisé, et MongoDB garantit une gestion agile des données. Ensemble, ils font de Pixelette une plateforme performante et évolutive.
-6. Conclusion
-La Galerie d’Art Générative et Interactive réinvente l’art numérique en plaçant l’intelligence artificielle au cœur d’une expérience créative et communautaire. Avec des outils qui transforment vos idées en chefs-d’œuvre instantanés, des galeries sublimées par des analyses visuelles et thématiques, et une plateforme où chaque interaction est fluide et sécurisée, cette app invite artistes et passionnés à repousser les limites de l’imagination. 
-Alors êtes vous prêt à faire naître vos chefs-d’œuvre ?
+### 💬 Gestion des Interactions
+- Système de likes et commentaires en temps réel
+- Signalement d'utilisateurs avec validation admin
+- Notifications instantanées (Django Channels)
+- Historique complet des interactions
+- **IA : Modération automatique** (détection toxicité/spam)
+- **IA : Suggestions de commentaires** générées par IA
+
+### 📊 Statistiques et Insights
+- Tableaux de bord personnalisés
+- Métriques détaillées (vues, likes, engagement)
+- Génération de rapports PDF/CSV
+- Graphiques de monitoring interactifs
+- **IA : Analyse prédictive** de popularité des œuvres
+
+## 🛠️ Technologies
+
+| Catégorie | Technologies |
+|-----------|-------------|
+| **Backend** | Django 4.2+, Django REST Framework, Python 3.10+ |
+| **Frontend** | React 18+, Three.js, Tailwind CSS |
+| **Base de Données** | MongoDB 6.0+ (Djongo) |
+| **Temps Réel** | Django Channels, WebSockets, Redis |
+| **Authentification** | JWT (djangorestframework-simplejwt) |
+| **IA** | Google Gemini API, Stable Diffusion, scikit-learn |
+| **Tests** | pytest, Jest, React Testing Library |
+| **Outils** | npm, pip, Git |
+
+## 📦 Prérequis
+
+Avant de commencer, assurez-vous d'avoir installé :
+
+- **Python** >= 3.10
+- **pip** >= 23.0
+- **Node.js** >= 18.x et **npm** >= 9.x
+- **MongoDB** >= 6.0
+- **Redis** >= 7.0
+- **Git**
+
+## 🚀 Installation
+
+### 1. Cloner le Repository
+
+```bash
+git clone https://github.com/votre-username/pixelette.git
+cd pixelette
+```
+
+### 2. Installer les Dépendances
+
+```bash
+cd backend
+python -m venv venv
+source venv/bin/activate  
+pip install -r requirements.txt
+
+cd ../frontend
+npm install
+```
+
+### 3. Configuration de l'Environnement
+
+```bash
+cd backend
+cp .env.example .env
+
+cd ../frontend
+cp .env.example .env
+```
+
+### 4. Configurer la Base de Données
+
+Démarrez MongoDB :
+
+```bash
+docker run -d -p 27017:27017 --name pixelette-mongo mongo:6.0
+
+mongod --dbpath /chemin/vers/data
+```
+
+Éditez le fichier `backend/.env` :
+
+```env
+MONGO_URI=mongodb://localhost:27017/pixelette
+MONGO_DB_NAME=pixelette
+```
+
+```
+
+### 5. Exécuter les Migrations
+
+```bash
+cd backend
+source venv/bin/activate
+
+python manage.py migrate
+
+python manage.py loaddata fixtures/initial_data.json
+
+python manage.py createsuperuser
+```
+
+### 6. Compiler les Assets
+
+```bash
+cd frontend
+
+npm run dev
+
+npm run build
+```
+
+### 8. Lancer les Serveurs
+
+```bash
+cd backend
+source venv/bin/activate
+python manage.py runserver
+
+cd backend
+source venv/bin/activate
+daphne -b 0.0.0.0 -p 8001 config.asgi:application
+
+cd frontend
+npm run dev
+```
+
+🎉 **L'application est maintenant accessible sur** [http://localhost:5173](http://localhost:5173)
+
+## ⚙️ Configuration
+
+### Configuration de l'IA
+
+L'application supporte Google Gemini et Stable Diffusion. Ajoutez vos clés API dans le fichier `backend/.env` :
+
+```env
+# Google Gemini (Analyse, Modération, Recommandations)
+GEMINI_API_KEY=votre_cle_api_gemini
+GEMINI_MODEL=gemini-2.0-flash-exp
+
+# Stable Diffusion (Génération d'images)
+STABILITY_API_KEY=votre_cle_stability_ai
+# Ou utiliser Replicate, DALL-E, etc.
+
+# OpenAI 
+OPENAI_API_KEY=votre_cle_api_openai
+OPENAI_BASE_URL=https://api.openai.com/v1
+OPENAI_REQUEST_TIMEOUT=30
+```
+
+### Configuration de Django
+
+```env
+# Django
+SECRET_KEY=votre_cle_secrete_django
+DEBUG=True
+ALLOWED_HOSTS=localhost,127.0.0.1
+
+# JWT
+JWT_SECRET_KEY=votre_cle_jwt
+JWT_ACCESS_TOKEN_LIFETIME=60  # minutes
+JWT_REFRESH_TOKEN_LIFETIME=7  # jours
+
+# Redis (Django Channels)
+REDIS_URL=redis://localhost:6379/0
+```
+
+### Configuration du Frontend
+
+Éditez le fichier `frontend/.env` :
+
+```env
+# API Backend
+VITE_API_URL=http://localhost:8000/api
+VITE_WS_URL=ws://localhost:8001/ws
+
+# Features
+VITE_ENABLE_3D_GALLERY=true
+VITE_MAX_UPLOAD_SIZE=5242880  # 5MB
+```
+
+### Configuration de l'Email (optionnel)
+
+```env
+EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
+EMAIL_HOST=smtp.gmail.com
+EMAIL_PORT=587
+EMAIL_HOST_USER=votre_email@gmail.com
+EMAIL_HOST_PASSWORD=votre_mot_de_passe_app
+EMAIL_USE_TLS=True
+```
+
+## 💻 Utilisation
+
+### Inscription et Connexion
+
+1. Accédez à [http://localhost:5173/register](http://localhost:5173/register) pour créer un compte
+2. Connectez-vous via [http://localhost:5173/login](http://localhost:5173/login)
+3. Complétez votre profil avec vos préférences artistiques
+
+### Tableau de Bord
+
+Après connexion, vous accédez à votre dashboard personnalisé :
+
+- **Artistes** : Créer, gérer et analyser vos œuvres
+- **Visiteurs** : Explorer, aimer et commenter les galeries
+- **Administrateurs** : Panneau de gestion complet (modération, statistiques)
+
+### Exemples de Routes
+
+**Routes Frontend :**
+```
+/dashboard            # Tableau de bord personnel
+/create               # Générer une œuvre avec IA
+/gallery/:id          # Voir une galerie
+/gallery/:id/3d       # Visite virtuelle 3D
+/explore              # Explorer les œuvres
+/profile/:username    # Profil utilisateur
+```
+
+**Routes API Backend :**
+```
+POST   /api/auth/register          # Inscription
+POST   /api/auth/login             # Connexion
+GET    /api/artworks/              # Liste des œuvres
+POST   /api/artworks/generate/     # Générer via IA
+GET    /api/galleries/             # Liste des galeries
+POST   /api/interactions/like/     # Liker une œuvre
+GET    /api/analytics/stats/       # Statistiques utilisateur
+```
+
+> 📖 Consultez `backend/config/urls.py` et la documentation API pour la liste complète
+
+## 🏗️ Architecture
+
+### Structure de la Base de Données
+
+L'application utilise MongoDB avec Djongo. Voici les principales collections :
+
+**Modules principaux :**
+- `users` - Gestion des utilisateurs avec préférences
+- `artworks` - Œuvres d'art avec métadonnées et couleurs
+- `galleries` - Collections thématiques avec curation IA
+- `interactions` - Likes, commentaires et signalements
+- `analytics` - Statistiques et métriques de performance
+- `ai_generations` - Historique des générations IA
+
+**Schéma détaillé :** Consultez `backend/docs/database_schema.md`
+
+### Structure du Projet
+
+```
+pixelette/
+├── backend/                    # Django Backend
+│   ├── apps/
+│   │   ├── users/             # Gestion utilisateurs
+│   │   ├── artworks/          # Œuvres d'art
+│   │   ├── galleries/         # Galeries
+│   │   ├── interactions/      # Likes, commentaires
+│   │   ├── analytics/         # Statistiques
+│   │   └── ai_services/       # Services IA
+│   ├── config/                # Configuration Django
+│   ├── requirements.txt
+│   └── manage.py
+├── frontend/                   # React Frontend
+│   ├── src/
+│   │   ├── components/        # Composants réutilisables
+│   │   ├── pages/             # Pages principales
+│   │   ├── services/          # API calls
+│   │   └── utils/             # Utilitaires
+│   ├── package.json
+│   └── vite.config.js
+├── docs/                       # Documentation
+└── docker-compose.yml         # Configuration Docker
+```
+
+## 🔌 API
+
+L'application expose une API RESTful sécurisée avec JWT.
+
+### Authentification
+
+```bash
+POST /api/auth/register
+Content-Type: application/json
+{
+  "username": "artiste",
+  "email": "artiste@pixelette.com",
+  "password": "SecurePass123!"
+}
+
+POST /api/auth/login
+{
+  "email": "artiste@pixelette.com",
+  "password": "SecurePass123!"
+}
+# Retourne: { "access": "jwt_token", "refresh": "refresh_token" }
+
+GET /api/artworks/
+Authorization: Bearer {jwt_token}
+```
+
+
+**Merci d'utiliser Pixelette pour créer et partager vos chefs-d'œuvre !** 🎨✨
+
+⭐ Si ce projet vous plaît, n'hésitez pas à lui donner une étoile sur GitHub !
+
