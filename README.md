@@ -54,7 +54,7 @@
 |-----------|-------------|
 | **Backend** | Django 4.2+, Django REST Framework, Python 3.10+ |
 | **Frontend** | React 18+, Three.js, Tailwind CSS |
-| **Base de Données** | MongoDB 6.0+ (Djongo) |
+| **Base de Données** | Sqlite (Djongo) |
 | **Temps Réel** | Django Channels, WebSockets, Redis |
 | **Authentification** | JWT (djangorestframework-simplejwt) |
 | **IA** | Google Gemini API, Stable Diffusion, scikit-learn |
@@ -65,12 +65,6 @@
 
 Avant de commencer, assurez-vous d'avoir installé :
 
-- **Python** >= 3.10
-- **pip** >= 23.0
-- **Node.js** >= 18.x et **npm** >= 9.x
-- **MongoDB** >= 6.0
-- **Redis** >= 7.0
-- **Git**
 
 ## 🚀 Installation
 
@@ -104,23 +98,6 @@ cp .env.example .env
 ```
 
 ### 4. Configurer la Base de Données
-
-Démarrez MongoDB :
-
-```bash
-docker run -d -p 27017:27017 --name pixelette-mongo mongo:6.0
-
-mongod --dbpath /chemin/vers/data
-```
-
-Éditez le fichier `backend/.env` :
-
-```env
-MONGO_URI=mongodb://localhost:27017/pixelette
-MONGO_DB_NAME=pixelette
-```
-
-```
 
 ### 5. Exécuter les Migrations
 
@@ -270,7 +247,7 @@ GET    /api/analytics/stats/       # Statistiques utilisateur
 
 ### Structure de la Base de Données
 
-L'application utilise MongoDB avec Djongo. Voici les principales collections :
+L'application utilise Sqlite avec Djongo. Voici les principales collections :
 
 **Modules principaux :**
 - `users` - Gestion des utilisateurs avec préférences
