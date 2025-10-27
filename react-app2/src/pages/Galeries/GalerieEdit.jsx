@@ -18,14 +18,14 @@ const GalerieEdit = () => {
   })
   const [errors, setErrors] = useState({})
   const [modal, setModal] = useState({ show: false, title: '', message: '', type: 'success' })
-
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
   useEffect(() => {
     fetchGalerie()
   }, [id])
 
   const fetchGalerie = async () => {
     try {
-      const response = await axios.get(`http://localhost:8000/api/galeries/${id}/`, {
+      const response = await axios.get(`${API_BASE}galeries/${id}/`, {
         withCredentials: true
       })
       const galerie = response.data

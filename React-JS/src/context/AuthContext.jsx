@@ -18,7 +18,9 @@ export const AuthProvider = ({ children }) => {
   const [authChecked, setAuthChecked] = useState(false);
   const [sessionRestored, setSessionRestored] = useState(false);  // NEW: Flag pour restore once only
   const [redirecting, setRedirecting] = useState(false);  // Flag pour éviter les boucles de redirection
-
+  const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+  const MEDIA_BASE = import.meta.env.VITE_MEDIA_URL || 'http://localhost:8000';  // Pour images
+  const FRONTOFFICE_URL = import.meta.env.VITE_FRONTOFFICE_URL || 'http://localhost:5173';  // Pour redirects
   useEffect(() => {
     if (localStorage.getItem('auth_checked')) return;
     checkAuth();
@@ -41,7 +43,7 @@ export const AuthProvider = ({ children }) => {
 
       if (tempId && !token) {
         console.log('✅ Temp ID trouvé dans l\'URL, récupération des données auth...');
-        const response = await axios.get(`http://localhost:8000/api/auth/get_temp/${tempId}/`, {
+        const response = await axios.get(`${API_BASE}auth/get_temp/${tempId}/`, {
           headers: { 'Content-Type': 'application/json' },
         });
         console.log('📌 Réponse API Get Temp:', response.data);
@@ -59,7 +61,7 @@ export const AuthProvider = ({ children }) => {
         // NEW: Restore ONLY once (no spam every second)
         if (!sessionRestored) {
           try {
-            await axios.post('http://localhost:8000/api/utilisateurs/restore_session/', {
+            await axios.post(`${API_BASE}utilisateurs/restore_session/`, {
               token: token,
               user_id: userDataTemp.id,
             }, {
@@ -94,7 +96,7 @@ export const AuthProvider = ({ children }) => {
             setIsAuthenticated(false);
             setLoading(false);
             setAuthChecked(true);
-            window.location.replace('http://localhost:5173/');  // Rediriger vers frontoffice
+            window.location.replace(`${FRONTOFFICE_URL}/`);  // Rediriger vers frontoffice
           }
           return;
         }
@@ -112,7 +114,7 @@ export const AuthProvider = ({ children }) => {
           setIsAuthenticated(false);
           setLoading(false);
           setAuthChecked(true);
-          window.location.replace('http://localhost:5173');
+          window.location.replace(`${FRONTOFFICE_URL}/`); 
         }
       } else {
         console.log('⚠️ No token/user, redirect to frontoffice');
@@ -120,7 +122,7 @@ export const AuthProvider = ({ children }) => {
         setIsAuthenticated(false);
         setLoading(false);
         setAuthChecked(true);
-        window.location.replace('http://localhost:5173');  // Rediriger vers frontoffice
+        window.location.replace(`${FRONTOFFICE_URL}/`);  // Rediriger vers frontoffice
       }
     } catch (error) {
       console.error('❌ CheckAuth error:', error);
@@ -130,14 +132,14 @@ export const AuthProvider = ({ children }) => {
       setIsAuthenticated(false);
       setLoading(false);
       setAuthChecked(true);
-      window.location.replace('http://localhost:5173');
+      window.location.replace(`${FRONTOFFICE_URL}/`); 
     }
   };
 
   const fetchProfile = async (token) => {
     try {
       console.log('📤 Fetch profile with token:', token.substring(0, 10) + '...');
-      const response = await axios.get('http://localhost:8000/api/utilisateurs/profile/', {
+      const response = await axios.get(`${API_BASE}utilisateurs/profile/`, {
         headers: { Authorization: `Token ${token}` },
         withCredentials: true,
       });
@@ -151,7 +153,7 @@ export const AuthProvider = ({ children }) => {
       }
 
       if (userData.image && !userData.image.startsWith('http')) {
-        userData.image = `http://localhost:8000${userData.image}`;
+        userData.image = `${MEDIA_BASE}${userData.image}`;
       }
 
       setUser(userData);
@@ -171,7 +173,7 @@ export const AuthProvider = ({ children }) => {
     try {
       const token = localStorage.getItem('token');
       if (token) {
-        await axios.post('http://localhost:8000/api/utilisateurs/logout/', {}, {
+        await axios.post(`${API_BASE}utilisateurs/logout/`, {}, {
           headers: { Authorization: `Token ${token}` },
           withCredentials: true,
         });
@@ -192,9 +194,9 @@ export const AuthProvider = ({ children }) => {
       
       // Add a small delay to ensure localStorage is cleared before redirect
       setTimeout(() => {
-        console.log('🚀 Redirection vers http://localhost:5173');
+        console.log('🚀 Redirection vers frontoffice');
         // Utiliser href au lieu de replace pour forcer la redirection
-        window.location.href = 'http://localhost:5173';
+        window.location.href = `${FRONTOFFICE_URL}`;
       }, 200); // Augmenté à 200ms pour être sûr
     }
   };
@@ -205,7 +207,7 @@ export const AuthProvider = ({ children }) => {
       return;
     }
     if (updatedData.image && !updatedData.image.startsWith('http')) {
-      updatedData.image = `http://localhost:8000${updatedData.image}`;
+      updatedData.image = `${MEDIA_BASE}${updatedData.image}`;
     }
     setUser(updatedData);
     localStorage.setItem('user', JSON.stringify(updatedData));

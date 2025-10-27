@@ -4,6 +4,7 @@ import axios from 'axios';
 import Modal from '../../components/Modal';
 
 const CodeVerification = () => {
+  const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
   const [code, setCode] = useState('');
   const [modal, setModal] = useState({ show: false, title: '', message: '', type: 'success' });
   const [isLoading, setIsLoading] = useState(false);
@@ -26,7 +27,7 @@ const CodeVerification = () => {
     }
     setIsLoading(true);
     try {
-      await axios.post('http://localhost:8000/api/utilisateurs/verify_code/', { email, reset_code: code });
+      await axios.post(`${API_BASE}utilisateurs/verify_code/`, { email, reset_code: code });
       setModal({ show: true, title: 'Succès !', message: 'Code vérifié !', type: 'success' });
       setTimeout(() => navigate('/reset-password', { state: { email, resetCode: code } }), 1500);
     } catch (error) {

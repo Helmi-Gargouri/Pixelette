@@ -19,6 +19,7 @@ const MesOeuvres = () => {
   const [predictingId, setPredictingId] = useState(null)
   const { user, isAuthenticated } = useAuth()
   const navigate = useNavigate()
+  const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
   useEffect(() => {
     // Rediriger si l'utilisateur n'est pas artiste ou admin
@@ -33,7 +34,7 @@ const MesOeuvres = () => {
 
   const fetchOeuvres = async () => {
     try {
-      const response = await axios.get('http://localhost:8000/api/oeuvres/', {
+      const response = await axios.get(`${API_BASE}oeuvres/`, {
         withCredentials: true
       })
       // Filtrer uniquement les oeuvres de l'utilisateur connecté
@@ -87,7 +88,7 @@ const MesOeuvres = () => {
     setConfirmModal({ show: false, oeuvreId: null })
 
     try {
-      await axios.delete(`http://localhost:8000/api/oeuvres/${id}/`, {
+      await axios.delete(`${API_BASE}oeuvres/${id}/`, {
         withCredentials: true
       })
       setOeuvres(oeuvres.filter(oeuvre => oeuvre.id !== id))
@@ -111,7 +112,7 @@ const MesOeuvres = () => {
     setPredictingId(oeuvre.id)
     try {
       const response = await axios.post(
-        `http://localhost:8000/api/oeuvres/${oeuvre.id}/predict_popularity/`,
+        `${API_BASE}oeuvres/${oeuvre.id}/predict_popularity/`,
         {},
         { withCredentials: true }
       )

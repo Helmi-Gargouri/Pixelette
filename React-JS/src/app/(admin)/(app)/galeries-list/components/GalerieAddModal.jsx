@@ -15,7 +15,7 @@ const GalerieAddModal = ({ show, onClose, onSuccess }) => {
   const [error, setError] = useState('');
   const [allOeuvres, setAllOeuvres] = useState([]);
   const [selectedOeuvres, setSelectedOeuvres] = useState([]);
-
+  const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
   useEffect(() => {
     if (show) {
       fetchAllOeuvres();
@@ -24,9 +24,10 @@ const GalerieAddModal = ({ show, onClose, onSuccess }) => {
 
   const fetchAllOeuvres = async () => {
     try {
-      const response = await axios.get('http://localhost:8000/api/oeuvres/', {
+      const response = await axios.get(`${API_BASE}oeuvres/`, {
         withCredentials: true
       });
+
       setAllOeuvres(response.data);
     } catch (error) {
       console.error('Erreur lors du chargement des œuvres:', error);
@@ -69,7 +70,7 @@ const GalerieAddModal = ({ show, onClose, onSuccess }) => {
         oeuvres: selectedOeuvres  // Ajoute les œuvres sélectionnées
       };
 
-      await axios.post('http://localhost:8000/api/galeries/', submitData, {
+      await axios.post(`${API_BASE}galeries/`, submitData, {
         withCredentials: true
       });
 

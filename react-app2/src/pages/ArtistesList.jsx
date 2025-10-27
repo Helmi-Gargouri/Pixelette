@@ -19,6 +19,8 @@ const ArtistesList = () => {
   const [sendingContact, setSendingContact] = useState(false)
   const [contactSuccess, setContactSuccess] = useState(false)
   const { user, isAuthenticated } = useAuth()
+  const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+  const MEDIA_BASE = import.meta.env.VITE_MEDIA_URL || 'http://localhost:8000';
 
   useEffect(() => {
     fetchArtistes()
@@ -26,7 +28,7 @@ const ArtistesList = () => {
 
   const fetchArtistes = async () => {
     try {
-      const response = await axios.get('http://localhost:8000/api/utilisateurs/artistes/', {
+      const response = await axios.get(`${API_BASE}utilisateurs/artistes/`, {
         withCredentials: true
       })
       setArtistes(response.data.artistes)
@@ -96,7 +98,7 @@ const ArtistesList = () => {
 
       if (isFollowing) {
         // Ne plus suivre
-        await axios.delete(`http://localhost:8000/api/suivis/${artisteId}/unfollow/`, {
+        await axios.delete(`${API_BASE}suivis/${artisteId}/unfollow/`, {
           withCredentials: true
         })
         
@@ -120,7 +122,7 @@ const ArtistesList = () => {
 
       } else {
         // Suivre
-        await axios.post('http://localhost:8000/api/suivis/', {
+        await axios.post(`${API_BASE}suivis/`, {
           artiste_id: artisteId
         }, {
           withCredentials: true
@@ -179,7 +181,7 @@ const ArtistesList = () => {
     setSendingContact(true)
     
     try {
-      await axios.post('http://localhost:8000/api/contacts/', {
+      await axios.post(`${API_BASE}contacts/`, {
         artiste_id: selectedArtiste.id,
         sujet: contactSubject,
         message: contactMessage

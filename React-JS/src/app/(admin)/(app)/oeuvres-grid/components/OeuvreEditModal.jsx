@@ -11,7 +11,7 @@ const OeuvreEditModal = ({ show, onClose, oeuvre, onSuccess }) => {
   const [imagePreview, setImagePreview] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-
+ const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
   useEffect(() => {
     if (oeuvre) {
       setFormData({
@@ -51,7 +51,7 @@ const OeuvreEditModal = ({ show, onClose, oeuvre, onSuccess }) => {
         submitData.append('image', formData.image);
       }
 
-      await axios.put(`http://localhost:8000/api/oeuvres/${oeuvre.id}/`, submitData, {
+      await axios.put(`${API_BASE}oeuvres/${oeuvre.id}/`, submitData, {
         withCredentials: true,
         headers: {
           'Content-Type': 'multipart/form-data'

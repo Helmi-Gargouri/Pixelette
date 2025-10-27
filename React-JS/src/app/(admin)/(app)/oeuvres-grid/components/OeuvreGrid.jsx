@@ -17,7 +17,7 @@ const OeuvreGrid = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 12;
-  
+  const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
   // States pour les modals
   const [showAddModal, setShowAddModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
@@ -31,7 +31,7 @@ const OeuvreGrid = () => {
 
   const fetchOeuvres = async () => {
     try {
-      const response = await axios.get('http://localhost:8000/api/oeuvres/', {
+      const response = await axios.get(`${API_BASE}oeuvres/`, {
         withCredentials: true
       });
       setOeuvres(response.data);
@@ -51,7 +51,7 @@ const OeuvreGrid = () => {
     if (!selectedOeuvre) return;
 
     try {
-      await axios.delete(`http://localhost:8000/api/oeuvres/${selectedOeuvre.id}/`, {
+      await axios.delete(`${API_BASE}oeuvres/${selectedOeuvre.id}/`, {
         withCredentials: true
       });
       setOeuvres(oeuvres.filter(o => o.id !== selectedOeuvre.id));

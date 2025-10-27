@@ -14,7 +14,7 @@ const OeuvreAddModal = ({ show, onClose, onSuccess }) => {
   const [imagePreview, setImagePreview] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-
+  const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
@@ -49,7 +49,7 @@ const OeuvreAddModal = ({ show, onClose, onSuccess }) => {
         submitData.append('image', formData.image);
       }
 
-      await axios.post('http://localhost:8000/api/oeuvres/', submitData, {
+      await axios.post(`${API_BASE}oeuvres/`, submitData, {
         withCredentials: true,
         headers: {
           'Content-Type': 'multipart/form-data'

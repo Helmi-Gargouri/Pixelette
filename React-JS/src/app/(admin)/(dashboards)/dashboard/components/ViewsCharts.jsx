@@ -36,7 +36,7 @@ export default function ViewsCharts({ galeries = [], oeuvres = [] }) {
     }
     return { labels: topLabels, values: topValues }
   }, [oeuvres])
-
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
   // Galeries chart options
   const galerieOptions = {
     chart: { 
@@ -321,7 +321,7 @@ function ArtistViewsPanel() {
         params.set('top', String(top))
         params.set('artists_only', artistsOnly ? 'true' : 'false')
         params.set('include_zero', includeZero ? 'true' : 'false')
-        const url = `http://localhost:8000/api/stats/views-by-artist/?${params.toString()}`
+        const url = `${API_BASE}stats/views-by-artist/?${params.toString()}`
         const res = await axios.get(url, { withCredentials: true })
         if (!mounted) return
         if (res.data && Array.isArray(res.data.labels) && Array.isArray(res.data.values)) {

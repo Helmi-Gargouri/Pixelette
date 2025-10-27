@@ -18,14 +18,14 @@ const GaleriesList = () => {
   const [sortBy, setSortBy] = useState('recent')
   const [currentSlides, setCurrentSlides] = useState({})
   const { user, isAuthenticated } = useAuth()
-
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
   useEffect(() => {
     fetchGaleries()
   }, [])
 
   const fetchGaleries = async () => {
     try {
-      const response = await axios.get('http://localhost:8000/api/galeries/', {
+      const response = await axios.get(`${API_BASE}galeries/`, {
         withCredentials: true
       })
       // Filtrer uniquement les galeries publiques

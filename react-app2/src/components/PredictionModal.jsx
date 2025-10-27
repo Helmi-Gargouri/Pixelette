@@ -7,7 +7,7 @@ const PredictionModal = ({ show, onClose, oeuvre, data }) => {
   const confidence = data?.confidence
   const tips = data?.tips || []
   const aiAdvice = data?.ai_advice
-
+const MEDIA_BASE = import.meta.env.VITE_MEDIA_URL || 'http://localhost:8000';
   // Calculate confidence level for styling
   const getConfidenceLevel = (conf) => {
     if (conf >= 80) return { level: 'Élevée', color: '#10b981', bg: '#dcfce7' }
@@ -129,10 +129,10 @@ const PredictionModal = ({ show, onClose, oeuvre, data }) => {
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
             {oeuvre?.image && (
               <img 
-                src={oeuvre.image.startsWith('http') 
-                  ? oeuvre.image 
-                  : `http://localhost:8000${oeuvre.image}`
-                } 
+               src={oeuvre.image.startsWith('http') 
+                    ? oeuvre.image 
+                    : `${MEDIA_BASE}${oeuvre.image}`
+                  }
                 alt={oeuvre.titre}
                 style={{
                   width: '80px',

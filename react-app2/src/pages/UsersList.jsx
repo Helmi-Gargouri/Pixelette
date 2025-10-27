@@ -13,6 +13,7 @@ const UsersList = () => {
   const [selectedUser, setSelectedUser] = useState(null);
   const [editForm, setEditForm] = useState({ prenom: '', nom: '', email: '', telephone: '' });
   const navigate = useNavigate();
+  const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -25,7 +26,7 @@ const UsersList = () => {
 
   const fetchCurrentRole = async (token) => {
     try {
-      const response = await axios.get('http://localhost:8000/api/utilisateurs/profile/', {
+      const response = await axios.get(`${API_BASE}utilisateurs/profile/`, {
         headers: { Authorization: `Token ${token}` },
         withCredentials: true
       });
@@ -48,7 +49,7 @@ const UsersList = () => {
 
   const fetchUsers = async (token) => {
     try {
-      const response = await axios.get('http://localhost:8000/api/utilisateurs/', {
+      const response = await axios.get(`${API_BASE}utilisateurs/`, {
         headers: { Authorization: `Token ${token}` },
         withCredentials: true
       });
@@ -82,7 +83,7 @@ const UsersList = () => {
     if (!selectedUser) return;
     const token = localStorage.getItem('token');
     try {
-      await axios.patch(`http://localhost:8000/api/utilisateurs/${selectedUser.id}/`, editForm, {
+      await axios.patch(`${API_BASE}utilisateurs/${selectedUser.id}/`, editForm, {
         headers: { Authorization: `Token ${token}` },
         withCredentials: true
       });
@@ -108,7 +109,7 @@ const UsersList = () => {
     if (!window.confirm('Confirmer suppression ?')) return;
     try {
       const token = localStorage.getItem('token');
-      await axios.delete(`http://localhost:8000/api/utilisateurs/${userId}/`, {
+      await axios.delete(`${API_BASE}utilisateurs/${userId}/`, {
         headers: { Authorization: `Token ${token}` },
         withCredentials: true
       });

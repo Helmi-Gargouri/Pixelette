@@ -4,6 +4,9 @@ import axios from 'axios';
 import { useAuth } from '../../context/AuthContext';
 
 const TwoFactorAuth = () => {
+  const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+  const MEDIA_BASE = import.meta.env.VITE_MEDIA_URL || 'http://localhost:8000';
+const BACKOFFICE_URL = import.meta.env.VITE_BACKOFFICE_URL || 'http://localhost:5174';
   const [verificationCode, setVerificationCode] = useState(['', '', '', '', '', '']);
   const [qrCode, setQrCode] = useState('');
   const [error, setError] = useState(null);
@@ -31,7 +34,7 @@ const TwoFactorAuth = () => {
                 const storeTempAndRedirect = async () => {
                   try {
                     const storeResponse = await axios.post(
-                      'http://localhost:8000/api/auth/store_temp/',
+                      `${API_BASE}auth/store_temp/`,
                       {
                         token: token,
                         user: userData,
@@ -44,9 +47,9 @@ const TwoFactorAuth = () => {
                       }
                     );
                     const tempId = storeResponse.data.temp_id;
-                    if (tempId) {
-                      window.location.href = `http://localhost:5174/dashboard?temp_id=${encodeURIComponent(tempId)}`;
-                    } else {
+                  if (tempId) {
+  window.location.href = `${BACKOFFICE_URL}/dashboard?temp_id=${encodeURIComponent(tempId)}`;
+} else {
                       navigate('/');
                     }
                   } catch (error) {
@@ -75,7 +78,7 @@ const TwoFactorAuth = () => {
         console.log('📤 Envoi requête QR code avec email:', email);
 
         const response = await axios.post(
-          'http://localhost:8000/api/utilisateurs/verify_2fa/',
+          `${API_BASE}utilisateurs/verify_2fa/`,
           { email },
           {
             withCredentials: true,
@@ -192,7 +195,7 @@ const TwoFactorAuth = () => {
       console.log('📤 Envoi code 2FA:', { email, code });
 
       const response = await axios.post(
-        'http://localhost:8000/api/utilisateurs/verify_2fa/',
+        `${API_BASE}utilisateurs/verify_2fa/`,
         { email, token: code },
         { withCredentials: true }
       );
@@ -214,7 +217,7 @@ const TwoFactorAuth = () => {
           // Stocker temporairement les données admin
           try {
             const storeResponse = await axios.post(
-              'http://localhost:8000/api/auth/store_temp/',
+              `${API_BASE}auth/store_temp/`,
               {
                 token: response.data.token,
                 user: response.data.user,
@@ -233,7 +236,7 @@ const TwoFactorAuth = () => {
             if (tempId) {
               localStorage.removeItem('email');
               setTimeout(() => {
-                window.location.href = `http://localhost:5174/dashboard?temp_id=${encodeURIComponent(tempId)}`;
+window.location.href = `${BACKOFFICE_URL}/dashboard?temp_id=${encodeURIComponent(tempId)}`;
               }, 500);
             } else {
               throw new Error('Identifiant temporaire non reçu');
@@ -244,9 +247,9 @@ const TwoFactorAuth = () => {
             localStorage.setItem('token', response.data.token);
             localStorage.setItem('user', JSON.stringify(response.data.user));
             localStorage.removeItem('email');
-            setTimeout(() => {
-              window.location.href = 'http://localhost:5174/dashboard';
-            }, 500);
+   setTimeout(() => {
+  window.location.href = `${BACKOFFICE_URL}/dashboard`;
+}, 500);
           }
         } else {
           console.log('✅ Utilisateur normal, redirection vers frontoffice...');

@@ -18,7 +18,8 @@ const GalerieCreate = () => {
   const [modal, setModal] = useState({ show: false, title: '', message: '', type: 'success' })
   const [allOeuvres, setAllOeuvres] = useState([])
   const [selectedOeuvres, setSelectedOeuvres] = useState([])
-
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+const MEDIA_BASE = import.meta.env.VITE_MEDIA_URL || 'http://localhost:8000';
   useEffect(() => {
     fetchAllOeuvres()
   }, [])
@@ -26,7 +27,7 @@ const GalerieCreate = () => {
   const fetchAllOeuvres = async () => {
     try {
       const token = localStorage.getItem('token')
-      const response = await axios.get('http://localhost:8000/api/oeuvres/', {
+      const response = await axios.get(`${API_BASE}oeuvres/`, {
         withCredentials: true,
         headers: {
           Authorization: `Token ${token}`
@@ -85,7 +86,7 @@ const GalerieCreate = () => {
     
     try {
       const token = localStorage.getItem('token')
-      await axios.post('http://localhost:8000/api/galeries/', 
+      await axios.post(`${API_BASE}galeries/`, 
         {
           ...formData,
           proprietaire: user.id,
@@ -281,7 +282,10 @@ const GalerieCreate = () => {
                             >
                               {oeuvre.image ? (
                                 <img 
-                                  src={oeuvre.image.startsWith('http') ? oeuvre.image : `http://localhost:8000${oeuvre.image}`}
+                           src={oeuvre.image.startsWith('http') 
+  ? oeuvre.image 
+  : `${MEDIA_BASE}${oeuvre.image}`
+}
                                   alt={oeuvre.titre}
                                   style={{ 
                                     width: '100%', 

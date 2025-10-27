@@ -25,7 +25,7 @@ const MesGaleries = () => {
   const [clusters, setClusters] = useState({})
   const [clustersLoading, setClustersLoading] = useState(false)
   const [predictionModal, setPredictionModal] = useState({ show: false, galerie: null, data: null })
-
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
   useEffect(() => {
     // Rediriger si l'utilisateur n'est pas artiste ou admin
     if (!isAuthenticated) {
@@ -39,7 +39,7 @@ const MesGaleries = () => {
 
   const fetchGaleries = async () => {
     try {
-      const response = await axios.get('http://localhost:8000/api/galeries/', {
+      const response = await axios.get(`${API_BASE}galeries/`, {
         withCredentials: true
       })
       // Filtrer uniquement les galeries de l'utilisateur connecté
@@ -57,7 +57,7 @@ const MesGaleries = () => {
   const fetchClusters = async () => {
     setClustersLoading(true)
     try {
-      const response = await axios.get('http://localhost:8000/api/galeries/clusters/', {
+      const response = await axios.get(`${API_BASE}galeries/clusters/`, {
         withCredentials: true,
         params: { num_clusters: 5, my: 'true' }  // 'my=true' pour clusters personnels
       })
@@ -129,7 +129,7 @@ const MesGaleries = () => {
     setConfirmModal({ show: false, galerieId: null })
 
     try {
-      await axios.delete(`http://localhost:8000/api/galeries/${id}/`, {
+      await axios.delete(`${API_BASE}galeries/${id}/`, {
         withCredentials: true
       })
       setGaleries(galeries.filter(galerie => galerie.id !== id))
@@ -318,7 +318,7 @@ const MesGaleries = () => {
 
   const handleGaleriePredict = async (galerie) => {
     try {
-      const resp = await axios.post(`http://localhost:8000/api/galeries/${galerie.id}/predict_popularity/`, {}, { withCredentials: true })
+      const resp = await axios.post(`${API_BASE}galeries/${galerie.id}/predict_popularity/`, {}, { withCredentials: true })
       setPredictionModal({ show: true, galerie, data: resp.data })
     } catch (err) {
       setModal({ show: true, title: 'Erreur', message: 'Impossible de prédire la popularité pour cette galerie', type: 'error' })

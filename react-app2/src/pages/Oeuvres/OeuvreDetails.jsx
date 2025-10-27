@@ -79,11 +79,12 @@ const OeuvreDetails = () => {
 
     return axios(config)
   }
-
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+const MEDIA_BASE = import.meta.env.VITE_MEDIA_URL || 'http://localhost:8000';
   useEffect(() => {
     fetchOeuvre()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-     axios.post('http://localhost:8000/api/consultations/', { 
+     axios.post(`${API_BASE}consultations/`, { 
       oeuvre_id: id 
     }, { withCredentials: true }).catch(() => {})
   }, [id])
@@ -108,7 +109,7 @@ const OeuvreDetails = () => {
 
   const fetchOeuvre = async () => {
     try {
-      const response = await axios.get(`http://localhost:8000/api/oeuvres/${id}/`, {
+      const response = await axios.get(`${API_BASE}oeuvres/${id}/`, {
         withCredentials: true
       })
       setOeuvre(response.data)
@@ -116,7 +117,7 @@ const OeuvreDetails = () => {
       // Fetch auteur details
       if (response.data.auteur) {
         const auteurResponse = await axios.get(
-          `http://localhost:8000/api/utilisateurs/${response.data.auteur}/`,
+          `${API_BASE}utilisateurs/${response.data.auteur}/`,
           { withCredentials: true }
         )
         setAuteur(auteurResponse.data)
@@ -136,7 +137,7 @@ const OeuvreDetails = () => {
       setLoadingInteractions(prev => ({ ...prev, stats: true }))
       
       const response = await axios.get(
-        `http://localhost:8000/api/interactions/stats_by_oeuvre/?oeuvre=${id}`,
+        `${API_BASE}interactions/stats_by_oeuvre/?oeuvre=${id}`,
         { withCredentials: true }
       )
       
@@ -164,7 +165,7 @@ const OeuvreDetails = () => {
   const fetchAllComments = async () => {
     try {
       const response = await axios.get(
-        `http://localhost:8000/api/interactions/comments_with_replies/?oeuvre=${id}`,
+        `${API_BASE}interactions/comments_with_replies/?oeuvre=${id}`,
         { withCredentials: true }
       )
       
@@ -179,7 +180,7 @@ const OeuvreDetails = () => {
       // Fallback vers l'ancienne méthode si le nouvel endpoint n'est pas disponible
       try {
         const fallbackResponse = await axios.get(
-          `http://localhost:8000/api/interactions/?oeuvre=${id}&type=commentaire`,
+          `${API_BASE}interactions/?oeuvre=${id}&type=commentaire`,
           { withCredentials: true }
         )
         
@@ -199,7 +200,7 @@ const OeuvreDetails = () => {
   const fetchInteractionDetails = async () => {
     try {
       const response = await axios.get(
-        `http://localhost:8000/api/interactions/?oeuvre=${id}`,
+        `${API_BASE}interactions/?oeuvre=${id}`,
         { withCredentials: true }
       )
       
@@ -241,7 +242,7 @@ const OeuvreDetails = () => {
 
     try {
       const response = await axios.get(
-        `http://localhost:8000/api/interactions/?oeuvre=${id}&type=like`,
+        `${API_BASE}interactions/?oeuvre=${id}&type=like`,
         { withCredentials: true }
       )
       
@@ -308,7 +309,7 @@ const OeuvreDetails = () => {
     try {
       const response = await makeAuthenticatedRequest(
         'post',
-        'http://localhost:8000/api/interactions/reply_to_comment/',
+        `${API_BASE}interactions/reply_to_comment/`,
         {
           parent: replyingTo,
           oeuvre: id,
@@ -386,7 +387,7 @@ const OeuvreDetails = () => {
       
       const response = await makeAuthenticatedRequest(
         'post',
-        `http://localhost:8000/api/oeuvres/${id}/generate_ai_comment/`,
+       `${API_BASE}oeuvres/${id}/generate_ai_comment/`,
         {}
       )
 
@@ -458,7 +459,7 @@ const OeuvreDetails = () => {
       
       const response = await makeAuthenticatedRequest(
         'post',
-        `http://localhost:8000/api/oeuvres/${id}/generate_multiple_ai_comments/`,
+        `${API_BASE}oeuvres/${id}/generate_multiple_ai_comments/`,
         { count: 3 }
       )
 
@@ -502,7 +503,7 @@ const OeuvreDetails = () => {
       
       const response = await makeAuthenticatedRequest(
         'post',
-        'http://localhost:8000/api/interactions/toggle_like/',
+        `${API_BASE}interactions/toggle_like/`,
         { oeuvre: parseInt(id) } // Convertir en entier
       )
 
@@ -559,7 +560,7 @@ const OeuvreDetails = () => {
       
       await makeAuthenticatedRequest(
         'post',
-        'http://localhost:8000/api/interactions/',
+       `${API_BASE}interactions/`,
         {
           type: 'commentaire',
           oeuvre: parseInt(id), // Convertir en entier
@@ -630,7 +631,7 @@ const OeuvreDetails = () => {
     setConfirmModal(false)
 
     try {
-      await axios.delete(`http://localhost:8000/api/oeuvres/${id}/`, {
+      await axios.delete(`${API_BASE}oeuvres/${id}/`, {
         withCredentials: true
       })
       setModal({ 
@@ -704,7 +705,7 @@ const OeuvreDetails = () => {
       try {
         await makeAuthenticatedRequest(
           'post',
-          'http://localhost:8000/api/interactions/',
+          `${API_BASE}interactions/`,
           {
             type: 'partage',
             oeuvre: parseInt(id), // Convertir en entier
@@ -952,10 +953,10 @@ const OeuvreDetails = () => {
                           }}
                         >
                           <img 
-                            src={oeuvre.image.startsWith('http') 
-                              ? oeuvre.image 
-                              : `http://localhost:8000${oeuvre.image}`
-                            } 
+                          src={oeuvre.image.startsWith('http') 
+                ? oeuvre.image 
+                : `${MEDIA_BASE}${oeuvre.image}`
+              }
                      alt={oeuvre.titre}
                             style={{ 
                               maxWidth: '100%',

@@ -20,6 +20,7 @@ const OeuvreAIGenerator = () => {
   const [errors, setErrors] = useState({})
   const [modal, setModal] = useState({ show: false, title: '', message: '', type: 'success' })
   const [zoomModal, setZoomModal] = useState(false)
+  const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
   const styles = [
     { value: 'realiste', label: 'Réaliste', description: 'photo réaliste, haute qualité, détaillé' },
@@ -48,7 +49,7 @@ const OeuvreAIGenerator = () => {
       const selectedStyle = styles.find(s => s.value === style)
       
       const response = await axios.post(
-        'http://localhost:8000/api/oeuvres/generate_ai_image/',
+        `${API_BASE}oeuvres/generate_ai_image/`,
         {
           prompt: prompt,
           style: selectedStyle?.description || ''

@@ -4,6 +4,7 @@ import axios from 'axios';
 import Modal from '../../components/Modal';
 
 const ResetPassword = () => {
+  const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
   const [formData, setFormData] = useState({ newPassword: '', confirmPassword: '' });
   const [modal, setModal] = useState({ show: false, title: '', message: '', type: 'success' });
   const location = useLocation();
@@ -28,7 +29,7 @@ const ResetPassword = () => {
       return;
     }
     try {
-      await axios.post('http://localhost:8000/api/utilisateurs/reset_password_code/', {
+      await axios.post(`${API_BASE}utilisateurs/reset_password_code/`, {
         email,
         reset_code: resetCode,
         new_password: formData.newPassword,

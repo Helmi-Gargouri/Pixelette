@@ -19,14 +19,14 @@ const OeuvreEdit = () => {
   const [errors, setErrors] = useState({})
   const [previewImage, setPreviewImage] = useState(null)
   const [modal, setModal] = useState({ show: false, title: '', message: '', type: 'success' })
-
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
   useEffect(() => {
     fetchOeuvre()
   }, [id])
 
   const fetchOeuvre = async () => {
     try {
-      const response = await axios.get(`http://localhost:8000/api/oeuvres/${id}/`, {
+      const response = await axios.get(`${API_BASE}oeuvres/${id}/`, {
         withCredentials: true
       })
       const oeuvre = response.data
@@ -116,7 +116,7 @@ const OeuvreEdit = () => {
       }
       
       const token = localStorage.getItem('token')
-      await axios.put(`http://localhost:8000/api/oeuvres/${id}/`, data, {
+      await axios.put(`${API_BASE}oeuvres/${id}/`, data, {
         withCredentials: true,
         headers: {
           Authorization: `Token ${token}`,

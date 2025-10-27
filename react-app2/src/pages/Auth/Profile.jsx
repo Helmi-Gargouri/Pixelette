@@ -6,6 +6,9 @@ import Modal from '../../components/Modal';
 import ConfirmModal from '../../components/ConfirmModal';
 
 const Profile = () => {
+  const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+  const MEDIA_BASE = import.meta.env.VITE_MEDIA_URL || 'http://localhost:8000';
+const BACKOFFICE_URL = import.meta.env.VITE_BACKOFFICE_URL || 'http://localhost:5174';
   const { user, updateUser, token } = useAuth();
   const [prenom, setPrenom] = useState('');
   const [nom, setNom] = useState('');
@@ -56,9 +59,9 @@ const Profile = () => {
     setTelephone(user.telephone || '');
     
     if (user.image) {
-      const imageUrl = user.image.startsWith('http') 
-        ? user.image 
-        : `http://localhost:8000${user.image}`;
+    const imageUrl = response.data.image.startsWith('http') 
+      ? response.data.image 
+      : `${MEDIA_BASE}${response.data.image}`;
       setImagePreview(imageUrl);
       setIsLocalPreview(false);
     } else {
@@ -78,7 +81,7 @@ useEffect(() => {
     const storeTempAndRedirect = async () => {
       try {
         const storeResponse = await axios.post(
-          'http://localhost:8000/api/auth/store_temp/',
+          `${API_BASE}auth/store_temp/`,
           {
             token: token,
             user: user,
@@ -92,8 +95,8 @@ useEffect(() => {
         );
         const tempId = storeResponse.data.temp_id;
         if (tempId) {
-          window.location.href = `http://localhost:5174/dashboard?temp_id=${encodeURIComponent(tempId)}`;
-        } else {
+  window.location.href = `${BACKOFFICE_URL}/dashboard?temp_id=${encodeURIComponent(tempId)}`;
+}else {
           navigate('/');
         }
       } catch (error) {
@@ -230,7 +233,7 @@ const getScoreColor = (percentage) => {
     
     try {
       const response = await axios.post(
-        'http://localhost:8000/api/utilisateurs/disable_2fa/', 
+        `${API_BASE}utilisateurs/disable_2fa/`, 
         {}, 
         {
           withCredentials: true
@@ -269,14 +272,14 @@ const getScoreColor = (percentage) => {
       
       // Seuls les admins peuvent accéder à /api/demandes/
       if (user.role === 'admin') {
-        const res = await axios.get('http://localhost:8000/api/demandes/', {
+        const res = await axios.get(`${API_BASE}demandes/`, {
           withCredentials: true
         });
         const pending = res.data.some(d => d.statut === 'pending' && d.utilisateur_nom === `${user.prenom} ${user.nom}`);
         setHasPendingRequest(pending);
       } else {
         // Pour les non-admin, vérifier s'ils ont une demande en cours
-        const res = await axios.get(`http://localhost:8000/api/demandes/?utilisateur=${user.id}`, {
+        const res = await axios.get(`${API_BASE}demandes/?utilisateur=${user.id}`, {
           withCredentials: true
         });
         const pending = res.data.some(d => d.statut === 'pending');
@@ -307,7 +310,7 @@ const getScoreColor = (percentage) => {
     formData.append('image', selectedImage);
     setIsUploading(true);
     try {
-      const response = await axios.patch(`http://localhost:8000/api/utilisateurs/${user.id}/`, formData, {
+      const response = await axios.patch(`${API_BASE}utilisateurs/${user.id}/`, formData, {
         headers: { 
           'Content-Type': 'multipart/form-data'
         },
@@ -315,9 +318,9 @@ const getScoreColor = (percentage) => {
       });
       setModal({ show: true, title: 'Succès !', message: 'Image mise à jour !', type: 'success' });
       updateUser(response.data);
-      const imageUrl = response.data.image.startsWith('http') 
-        ? response.data.image 
-        : `http://localhost:8000${response.data.image}`;
+const imageUrl = response.data.image.startsWith('http') 
+  ? response.data.image 
+  : `${MEDIA_BASE}${response.data.image}`;
       setImagePreview(imageUrl);
       setIsLocalPreview(false);
       setSelectedImage(null);
@@ -335,7 +338,7 @@ const getScoreColor = (percentage) => {
     e.preventDefault();
     setIsSubmitting(true);
     try {
-      const response = await axios.patch(`http://localhost:8000/api/utilisateurs/${user.id}/`, {
+      const response = await axios.patch(`${API_BASE}utilisateurs/${user.id}/`, {
         prenom,
         nom,
         telephone
@@ -360,7 +363,7 @@ const getScoreColor = (percentage) => {
   const handleDeleteConfirm = async () => {
     setConfirmModal(false);
     try {
-      await axios.delete(`http://localhost:8000/api/utilisateurs/${user.id}/`, {
+      await axios.delete(`${API_BASE}utilisateurs/${user.id}/`, {
         withCredentials: true
       });
       localStorage.removeItem('token');
@@ -393,7 +396,7 @@ const getScoreColor = (percentage) => {
         return;
       }
       
-      const response = await axios.post('http://localhost:8000/api/demandes/', {
+      const response = await axios.post(`${API_BASE}demandes/`, {
         nouveau_role: 'artiste',
         raison: raison || ''  
       }, {
@@ -424,7 +427,7 @@ const getScoreColor = (percentage) => {
     
     try {
       const response = await axios.post(
-        'http://localhost:8000/api/utilisateurs/enable_2fa/', 
+        `${API_BASE}utilisateurs/enable_2fa/`, 
         {}, 
         {
           withCredentials: true

@@ -5,6 +5,8 @@ import { useAuth } from '../../context/AuthContext';
 import Modal from '../../components/Modal';
 
 const Login = () => {
+  const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+  const BACKOFFICE_URL = import.meta.env.VITE_BACKOFFICE_URL || 'http://localhost:5174';
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [modal, setModal] = useState({ show: false, title: '', message: '', type: 'success' });
@@ -15,7 +17,7 @@ const Login = () => {
     e.preventDefault();
     try {
       const response = await axios.post(
-        'http://localhost:8000/api/utilisateurs/login/',
+        `${API_BASE}utilisateurs/login/`,
         { email, password },
         { withCredentials: true }
       );
@@ -46,7 +48,7 @@ const Login = () => {
             try {
               console.log('✅ Admin détecté, envoi des données à l\'API temporaire...');
               const storeResponse = await axios.post(
-                'http://localhost:8000/api/auth/store_temp/',
+                `${API_BASE}auth/store_temp/`,
                 {
                   token: response.data.token,
                   user: userData,
@@ -62,11 +64,11 @@ const Login = () => {
               console.log('📌 Réponse API Store Temp:', storeResponse.data);
               const tempId = storeResponse.data.temp_id;
               
-              if (tempId) {
-                setTimeout(() => {
-                  window.location.href = `http://localhost:5174/dashboard?temp_id=${encodeURIComponent(tempId)}`;
-                }, 1500);
-              } else {
+           if (tempId) {
+  setTimeout(() => {
+    window.location.href = `${BACKOFFICE_URL}/dashboard?temp_id=${encodeURIComponent(tempId)}`;
+  }, 1500);
+} else {
                 throw new Error('Identifiant temporaire non reçu');
               }
             } catch (error) {

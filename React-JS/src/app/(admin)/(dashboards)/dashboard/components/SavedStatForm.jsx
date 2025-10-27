@@ -28,7 +28,7 @@ const SavedStatForm = ({ onCreated }) => {
       { value: 'oeuvres__count', label: 'Nombre d’œuvres par galerie' }
     ]
   }
-
+  const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
   const [subjectField, setSubjectField] = useState(() => {
     const first = FIELDS_BY_SUBJECT['utilisateur'] && FIELDS_BY_SUBJECT['utilisateur'][0]
     return first ? first.value : ''
@@ -61,7 +61,7 @@ const SavedStatForm = ({ onCreated }) => {
       }
       const token = localStorage.getItem('token') || sessionStorage.getItem('token')
       const headers = token ? { Authorization: `Token ${token}` } : {}
-      const res = await axios.post('http://localhost:8000/api/saved-stats/', payload, { withCredentials: true, headers })
+      const res = await axios.post(`${API_BASE}saved-stats/`, payload, { withCredentials: true, headers })
       onCreated && onCreated(res.data)
       setTitle('')
       setChartType('pie')

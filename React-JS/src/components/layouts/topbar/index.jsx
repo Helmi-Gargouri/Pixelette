@@ -140,8 +140,8 @@ const notifications = {
 const Topbar = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-
-  const handleLogout = async () => {
+  const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+  const MEDIA_BASE = import.meta.env.VITE_MEDIA_URL || 'http://localhost:8000';  
     await logout();
     // logout() dans AuthContext.jsx redirige déjà vers localhost:5173
     // Pas besoin de navigate ici
@@ -155,7 +155,7 @@ const Topbar = () => {
       return user.image;
     }
     // Sinon, ajoute l'URL de base
-    return `http://localhost:8000${user.image}`;
+    return `${MEDIA_BASE}${user.image}`;
   };
 
   // Obtiens les initiales de l'utilisateur

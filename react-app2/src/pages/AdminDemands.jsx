@@ -10,6 +10,7 @@ const AdminDemands = () => {
   const [sortBy, setSortBy] = useState('date_demande');
   const [currentUserRole, setCurrentUserRole] = useState('');
   const navigate = useNavigate();
+  const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -22,7 +23,7 @@ const AdminDemands = () => {
 
   const fetchCurrentRole = async (token) => {
     try {
-      const response = await axios.get('http://localhost:8000/api/utilisateurs/profile/', {
+      const response = await axios.get(`${API_BASE}utilisateurs/profile/`, {
         headers: { Authorization: `Token ${token}` },
         withCredentials: true
       });
@@ -45,7 +46,7 @@ const AdminDemands = () => {
 
   const fetchDemandes = async (token) => {
     try {
-      const response = await axios.get('http://localhost:8000/api/demandes/', {
+      const response = await axios.get(`${API_BASE}demandes/`, {
         headers: { Authorization: `Token ${token}` },
         withCredentials: true
       });
@@ -89,7 +90,7 @@ const AdminDemands = () => {
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.patch(`http://localhost:8000/api/demandes/${id}/approuver/`, {}, {
+      const response = await axios.patch(`${API_BASE}demandes/${id}/approuver/`, {}, {
         headers: { Authorization: `Token ${token}` },
         withCredentials: true
       });
@@ -106,7 +107,7 @@ const AdminDemands = () => {
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.patch(`http://localhost:8000/api/demandes/${id}/rejeter/`, {}, {
+      const response = await axios.patch(`${API_BASE}demandes/${id}/rejeter/`, {}, {
         headers: { Authorization: `Token ${token}` },
         withCredentials: true
       });

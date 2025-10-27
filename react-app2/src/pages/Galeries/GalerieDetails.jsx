@@ -25,7 +25,7 @@ const GalerieDetails = () => {
   const [spotifyModal, setSpotifyModal] = useState({ show: false, playlist: null, loading: false })
   const [paletteModal, setPaletteModal] = useState({ show: false, data: null, loading: false })
   const [gallery3D, setGallery3D] = useState(false)
-
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
   useEffect(() => {
     fetchGalerie()
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -33,7 +33,7 @@ const GalerieDetails = () => {
 
   const fetchGalerie = async () => {
     try {
-      const response = await axios.get(`http://localhost:8000/api/galeries/${id}/`, {
+      const response = await axios.get(`${API_BASE}galeries/${id}/`, {
         withCredentials: true
       })
       setGalerie(response.data)
@@ -41,7 +41,7 @@ const GalerieDetails = () => {
       
       if (response.data.proprietaire) {
         const propResponse = await axios.get(
-          `http://localhost:8000/api/utilisateurs/${response.data.proprietaire}/`,
+          `${API_BASE}utilisateurs/${response.data.proprietaire}/`,
           { withCredentials: true }
         )
         setProprietaire(propResponse.data)
@@ -64,7 +64,7 @@ const GalerieDetails = () => {
     setConfirmModal(false)
 
     try {
-      await axios.delete(`http://localhost:8000/api/galeries/${id}/`, {
+      await axios.delete(`${API_BASE}galeries/${id}/`, {
         withCredentials: true
       })
       setModal({ 
@@ -98,7 +98,7 @@ const GalerieDetails = () => {
 
     try {
       const response = await axios.get(
-        `http://localhost:8000/api/galeries/${id}/generate_spotify_playlist/`,
+        `${API_BASE}galeries/${id}/generate_spotify_playlist/`,
         { withCredentials: true }
       )
       
@@ -134,7 +134,7 @@ const GalerieDetails = () => {
     try {
       // Obtient l'URL d'autorisation Spotify
       const authResponse = await axios.get(
-        `http://localhost:8000/api/spotify/auth-url/?galerie_id=${id}`,
+        `${API_BASE}spotify/auth-url/?galerie_id=${id}`,
         { withCredentials: true }
       )
 
@@ -182,7 +182,7 @@ const GalerieDetails = () => {
       setSpotifyModal({ show: true, playlist: null, loading: true, created: false })
       
       const response = await axios.post(
-        'http://localhost:8000/api/spotify/create-playlist/',
+       `${API_BASE}spotify/create-playlist/`,
         {
           access_token: accessToken,
           galerie_id: id,
@@ -218,7 +218,7 @@ const GalerieDetails = () => {
 
     try {
       const response = await axios.get(
-        `http://localhost:8000/api/galeries/${id}/palette/`,
+        `${API_BASE}galeries/${id}/palette/`,
         { withCredentials: true }
       )
       

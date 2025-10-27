@@ -28,7 +28,7 @@ const DemandesRoles = () => {
   const [total, setTotal] = useState(0);
   const navigate = useNavigate();
   const demandesPerPage = 10;
-
+  const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
     if (!storedUser) {
@@ -53,7 +53,7 @@ const DemandesRoles = () => {
       if (search) params.append('search', search);
       if (statutFilter) params.append('statut', statutFilter);
       const response = await axios.get(
-        `http://localhost:8000/api/demandes/?${params.toString()}`,
+        `${API_BASE}demandes/?${params.toString()}`,
         {
           headers: { Authorization: `Token ${token}` },
           withCredentials: true
@@ -92,7 +92,7 @@ const DemandesRoles = () => {
     try {
       const token = localStorage.getItem('token');
       await axios.patch(
-        `http://localhost:8000/api/demandes/${id}/approuver/`,
+        `${API_BASE}demandes/${id}/approuver/`,
         {},
         { headers: { Authorization: `Token ${token}` }, withCredentials: true }
       );
@@ -108,7 +108,7 @@ const DemandesRoles = () => {
     try {
       const token = localStorage.getItem('token');
       await axios.patch(
-        `http://localhost:8000/api/demandes/${id}/rejeter/`,
+        `${API_BASE}demandes/${id}/rejeter/`,
         {},
         { headers: { Authorization: `Token ${token}` }, withCredentials: true }
       );

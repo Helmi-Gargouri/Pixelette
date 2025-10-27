@@ -36,7 +36,7 @@ function FirstPersonControls() {
           break
       }
     }
-
+const MEDIA_BASE = import.meta.env.VITE_MEDIA_URL || 'http://localhost:8000';
     const handleKeyUp = (e) => {
       switch (e.code) {
         case 'KeyW':
@@ -156,8 +156,7 @@ function Artwork({ position, rotation, imageUrl, title, description, oeuvre }) {
       img.crossOrigin = 'anonymous'
       const fullUrl = imageUrl.startsWith('http') 
         ? imageUrl 
-        : `http://localhost:8000${imageUrl}`
-      
+        : `${MEDIA_BASE}${imageUrl}`;
       img.onload = () => {
         const aspectRatio = img.width / img.height
         let width = 2
@@ -267,13 +266,13 @@ function ArtworkMaterial({ imageUrl, onLoad }) {
       return
     }
 
-    // Construire l'URL complète si elle est relative
-    let fullUrl = imageUrl
-    if (!imageUrl.startsWith('http')) {
-      fullUrl = imageUrl.startsWith('/') 
-        ? `http://localhost:8000${imageUrl}`
-        : `http://localhost:8000/${imageUrl}`
-    }
+ // Construire l'URL complète si elle est relative
+let fullUrl = imageUrl;
+if (!imageUrl.startsWith('http')) {
+  fullUrl = imageUrl.startsWith('/') 
+    ? `${MEDIA_BASE}${imageUrl}`
+    : `${MEDIA_BASE}/${imageUrl}`;
+}
 
     // Vérifier si la texture est déjà en cache
     if (textureCache.has(fullUrl)) {

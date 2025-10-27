@@ -8,7 +8,7 @@ const Recommendations = () => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const { isAuthenticated } = useAuth()
-
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
   useEffect(() => {
     if (isAuthenticated) {
       fetchRecommendations()
@@ -19,7 +19,7 @@ const fetchRecommendations = async () => {
   try {
     const token = localStorage.getItem('token')
     const response = await axios.get(
-      'http://localhost:8000/api/oeuvres/recommendations/',
+      `${API_BASE}oeuvres/recommendations/`,
       {
         headers: { Authorization: `Token ${token}` },
         withCredentials: true

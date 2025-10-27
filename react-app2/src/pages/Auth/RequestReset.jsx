@@ -3,6 +3,7 @@ import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 
 const RequestReset = () => {
+  const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
     const [email, setEmail] = useState('');
     const [message, setMessage] = useState('');
     const navigate = useNavigate();
@@ -10,7 +11,7 @@ const RequestReset = () => {
     const handleSubmit = async (e) => {
       e.preventDefault();
       try {
-        await axios.post('http://localhost:8000/api/utilisateurs/request_password_reset/', { email });
+        await axios.post(`${API_BASE}utilisateurs/request_password_reset/`, { email });
         setMessage('Email envoyé ! Vérifiez votre boîte.');
         setTimeout(() => navigate('/login'), 3000);
       } catch (error) {

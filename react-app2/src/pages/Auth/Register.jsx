@@ -4,6 +4,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import Modal from '../../components/Modal';
 
 const Register = () => {
+  const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
   const [formData, setFormData] = useState({
     nom: '',
     prenom: '',
@@ -74,7 +75,7 @@ const Register = () => {
 
     setIsSubmitting(true);
     try {
-      await axios.post('http://localhost:8000/api/utilisateurs/', 
+      await axios.post(`${API_BASE}utilisateurs/`, 
         { ...formData, password_confirm: formData.passwordConfirm },
         { withCredentials: true }
       );

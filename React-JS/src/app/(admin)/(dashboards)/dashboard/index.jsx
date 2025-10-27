@@ -27,7 +27,7 @@ const Index = () => {
   const [aiSaving, setAiSaving] = useState(false);
   const [generatingReport, setGeneratingReport] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('general');
-
+  const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
   useEffect(() => {
     fetchData();
   }, []);
@@ -35,15 +35,15 @@ const Index = () => {
   const fetchData = async () => {
     try {
       const [oeuvresRes, galeriesRes] = await Promise.all([
-        axios.get('http://localhost:8000/api/oeuvres/', { withCredentials: true }),
-        axios.get('http://localhost:8000/api/galeries/', { withCredentials: true })
+        axios.get(`${API_BASE}oeuvres/`, { withCredentials: true }),
+        axios.get(`${API_BASE}galeries/`, { withCredentials: true })
       ]);
       
       setOeuvres(oeuvresRes.data);
       setGaleries(galeriesRes.data);
 
       try {
-        const countRes = await axios.get('http://localhost:8000/api/utilisateurs/count/', { 
+        const countRes = await axios.get(`${API_BASE}utilisateurs/count/`, { 
           withCredentials: true 
         });
         const fakeUsers = Array(countRes.data.count).fill({ id: 0 });
@@ -64,7 +64,7 @@ const Index = () => {
     setGeneratingReport(true);
     try {
       const res = await axios.post(
-        'http://localhost:8000/api/reports/summary/',
+        `${API_BASE}reports/summary/`,
         { download: true },
         { withCredentials: true, responseType: 'blob' }
       );
@@ -114,7 +114,7 @@ const Index = () => {
     if (!aiPrompt.trim()) return alert('Entrez une description en français de ce que vous souhaitez.');
     setAiLoading(true);
     try {
-      const res = await axios.post('http://localhost:8000/api/ai/generate-chart/', { prompt: aiPrompt }, { withCredentials: true })
+      const res = await axios.post(`${API_BASE}ai/generate-chart/`, { prompt: aiPrompt }, { withCredentials: true })
       if (res.data?.success) {
         setAiResult(res.data)
       } else {
@@ -152,7 +152,7 @@ const Index = () => {
     try {
       const token = localStorage.getItem('token') || sessionStorage.getItem('token')
       const headers = token ? { Authorization: `Token ${token}` } : {}
-      await axios.post('http://localhost:8000/api/saved-stats/', payload, { withCredentials: true, headers })
+      await axios.post(`${API_BASE}saved-stats/`, payload, { withCredentials: true, headers })
       alert('Widget sauvegardé !')
       // refresh the saved stats list by bumping the key
       setStatsRefreshKey(k => k + 1)

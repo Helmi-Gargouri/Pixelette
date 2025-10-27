@@ -12,14 +12,15 @@ const OeuvresList = () => {
   const [sortBy, setSortBy] = useState('recent')
   const [showShareMenu, setShowShareMenu] = useState(null)
   const { user, isAuthenticated } = useAuth()
-
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+const MEDIA_BASE = import.meta.env.VITE_MEDIA_URL || 'http://localhost:8000';
   useEffect(() => {
     fetchOeuvres()
   }, [])
 
   const fetchOeuvres = async () => {
     try {
-      const response = await axios.get('http://localhost:8000/api/oeuvres/', {
+      const response = await axios.get(`${API_BASE}oeuvres/`, {
         withCredentials: true
       })
       // Afficher toutes les oeuvres (elles sont toutes publiques)
@@ -86,7 +87,7 @@ const OeuvresList = () => {
     event.stopPropagation()
     
     if (platform !== 'copy') {
-    axios.post('http://localhost:8000/api/partages/', { 
+    axios.post(`${API_BASE}partages/`, { 
       oeuvre_id: oeuvre.id, 
       plateforme: platform 
     }, { withCredentials: true }).catch(() => {})
@@ -287,10 +288,10 @@ const OeuvresList = () => {
                             <div className="portfolio-thumb" style={{ position: 'relative' }}>
                        {oeuvre.image ? (
                          <img 
-                                  src={oeuvre.image.startsWith('http') 
-                                    ? oeuvre.image 
-                                    : `http://localhost:8000${oeuvre.image}`
-                                  } 
+                        src={oeuvre.image.startsWith('http') 
+  ? oeuvre.image 
+  : `${MEDIA_BASE}${oeuvre.image}`
+}
                            alt={oeuvre.titre}
                            style={{ 
                              width: '100%',
@@ -493,10 +494,11 @@ const OeuvresList = () => {
                             <div className="portfolio-thumb" style={{ position: 'relative' }}>
                               {oeuvre.image ? (
                                 <img 
+                              
                                   src={oeuvre.image.startsWith('http') 
-                                    ? oeuvre.image 
-                                    : `http://localhost:8000${oeuvre.image}`
-                                  } 
+  ? oeuvre.image 
+  : `${MEDIA_BASE}${oeuvre.image}`
+}
                                   alt={oeuvre.titre}
                                   style={{ 
                                     width: '100%', 

@@ -14,7 +14,7 @@ const GalerieManageOeuvres = () => {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [modal, setModal] = useState({ show: false, title: '', message: '', type: 'success' })
-
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
   useEffect(() => {
     fetchData()
   }, [id])
@@ -22,14 +22,14 @@ const GalerieManageOeuvres = () => {
   const fetchData = async () => {
     try {
       // Fetch galerie
-      const galerieResponse = await axios.get(`http://localhost:8000/api/galeries/${id}/`, {
+      const galerieResponse = await axios.get(`${API_BASE}galeries/${id}/`, {
         withCredentials: true
       })
       setGalerie(galerieResponse.data)
       setOeuvresSelectionnees(galerieResponse.data.oeuvres || [])
 
       // Fetch toutes les oeuvres de l'utilisateur
-      const oeuvresResponse = await axios.get('http://localhost:8000/api/oeuvres/', {
+      const oeuvresResponse = await axios.get(`${API_BASE}oeuvres/`, {
         withCredentials: true
       })
       
@@ -65,7 +65,7 @@ const GalerieManageOeuvres = () => {
     
     try {
       const token = localStorage.getItem('token')
-      await axios.patch(`http://localhost:8000/api/galeries/${id}/`, 
+      await axios.patch(`${API_BASE}galeries/${id}/`, 
         {
           oeuvres: oeuvresSelectionnees
         },

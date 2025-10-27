@@ -46,7 +46,7 @@ const UserGrid = () => {
   const { isAuthenticated, loading: authLoading, user } = useAuth();
   const navigate = useNavigate();
   const usersPerPage = 8;
-
+  const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
   useEffect(() => {
     if (authLoading) return;
     if (!isAuthenticated || !user || user.role !== 'admin') {
@@ -71,9 +71,7 @@ const fetchUsers = async () => {
       throw new Error('Aucun token trouvé dans localStorage');
     }
 
-    //const response = await axios.get(`http://localhost:8000/api/utilisateurs/`, {
-    const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
-    const response = await axios.get(`${API_BASE}/utilisateurs/`, {
+const response = await axios.get(`${API_BASE}utilisateurs/`, {
       headers: {
         Authorization: `Token ${token}`,
         'Content-Type': 'application/json',
@@ -187,8 +185,8 @@ const fetchUsers = async () => {
     try {
       const token = localStorage.getItem('token');
       const response = await axios.post(
-        `http://localhost:8000/api/utilisateurs/`,
-        addForm,
+      `${API_BASE}utilisateurs/`,
+      addForm,
         {
           headers: { Authorization: `Token ${token}` },
           withCredentials: true,
@@ -223,7 +221,7 @@ const fetchUsers = async () => {
     try {
       const token = localStorage.getItem('token');
       const response = await axios.patch(
-        `http://localhost:8000/api/utilisateurs/${selectedUser.id}/`,
+        `${API_BASE}utilisateurs/${selectedUser.id}/`,
         editForm,
         {
           headers: { Authorization: `Token ${token}` },
@@ -251,8 +249,8 @@ const fetchUsers = async () => {
     setIsSubmitting(true);
     try {
       const token = localStorage.getItem('token');
-      await axios.delete(`http://localhost:8000/api/utilisateurs/${userId}/`, {
-        headers: { Authorization: `Token ${token}` },
+    await axios.delete(`${API_BASE}utilisateurs/${userId}/`, {
+          headers: { Authorization: `Token ${token}` },
         withCredentials: true,
       });
       setUsers(users.filter((u) => u.id !== userId));

@@ -16,7 +16,7 @@ const OeuvreCreate = () => {
   const [errors, setErrors] = useState({})
   const [previewImage, setPreviewImage] = useState(null)
   const [modal, setModal] = useState({ show: false, title: '', message: '', type: 'success' })
-
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
   const handleChange = (e) => {
     const { name, value } = e.target
     setFormData(prev => ({
@@ -85,14 +85,14 @@ const OeuvreCreate = () => {
         data.append('image', formData.image)
       }
       
-      const token = localStorage.getItem('token')
-      await axios.post('http://localhost:8000/api/oeuvres/', data, {
-        withCredentials: true,
-        headers: {
-          Authorization: `Token ${token}`,
-          'Content-Type': 'multipart/form-data'
-        }
-      })
+   const token = localStorage.getItem('token')
+await axios.post(`${API_BASE}oeuvres/`, data, {
+  withCredentials: true,
+  headers: {
+    Authorization: `Token ${token}`,
+    'Content-Type': 'multipart/form-data'
+  }
+})
       
       setModal({ 
         show: true, 

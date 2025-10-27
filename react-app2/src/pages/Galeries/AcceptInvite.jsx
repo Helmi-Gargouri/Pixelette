@@ -8,7 +8,7 @@ const AcceptInvite = () => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [success, setSuccess] = useState(false)
-
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
   useEffect(() => {
     acceptInvitation()
   }, [])
@@ -16,7 +16,7 @@ const AcceptInvite = () => {
   const acceptInvitation = async () => {
     try {
       const response = await axios.post(
-        `http://localhost:8000/api/galeries/${id}/accept-invite/${token}/`,
+        `${API_BASE}galeries/${id}/accept-invite/${token}/`,
         {},
         { withCredentials: true }
       )

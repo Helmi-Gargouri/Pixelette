@@ -9,6 +9,7 @@ const InviteModal = ({ show, onClose, galerieId, galerieName }) => {
   const [searchTerm, setSearchTerm] = useState('')
   const [sending, setSending] = useState(false)
   const [message, setMessage] = useState({ show: false, text: '', type: 'success' })
+  const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
   useEffect(() => {
     if (show) {
@@ -27,7 +28,7 @@ const InviteModal = ({ show, onClose, galerieId, galerieName }) => {
 
   const fetchUsers = async () => {
     try {
-      const response = await axios.get('http://localhost:8000/api/utilisateurs/', {
+      const response = await axios.get(`${API_BASE}utilisateurs/`, {
         withCredentials: true
       })
       setUsers(response.data)
@@ -50,7 +51,7 @@ const InviteModal = ({ show, onClose, galerieId, galerieName }) => {
     setSending(true)
     try {
       await axios.post(
-        `http://localhost:8000/api/galeries/${galerieId}/invite/`,
+        `${API_BASE}galeries/${galerieId}/invite/`,
         { user_id: selectedUser.id },
         { withCredentials: true }
       )

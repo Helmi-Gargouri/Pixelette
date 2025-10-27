@@ -4,6 +4,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import Modal from '../../components/Modal';
 
 const ForgotPassword = () => {
+  const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
   const [email, setEmail] = useState('');
   const [modal, setModal] = useState({ show: false, title: '', message: '', type: 'success' });
   const [isLoading, setIsLoading] = useState(false);
@@ -13,7 +14,7 @@ const ForgotPassword = () => {
     e.preventDefault();
     setIsLoading(true);
     try {
-      const response = await axios.post('http://localhost:8000/api/utilisateurs/forgot_password/', { email });
+      const response = await axios.post(`${API_BASE}utilisateurs/forgot_password/`, { email });
       setModal({ show: true, title: 'Succès !', message: response.data.message, type: 'success' });
       setTimeout(() => navigate('/code-verification', { state: { email } }), 2000);
     } catch (error) {

@@ -7,7 +7,7 @@ const Header = () => {
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [imageError, setImageError] = useState(false)
   const dropdownRef = useRef(null)
-
+ const MEDIA_BASE = import.meta.env.VITE_MEDIA_URL || 'http://localhost:8000';
   const handleLogout = async () => {
     await logout()
     setDropdownOpen(false)
@@ -132,7 +132,7 @@ const Header = () => {
                       >
                         {user?.image && !imageError ? (
                           <img 
-                            src={user.image.startsWith('http') ? user.image : `http://localhost:8000${user.image}`} 
+                            src={user.image.startsWith('http') ? user.image : `${MEDIA_BASE}${user.image}`} 
                             alt={`${user.prenom} ${user.nom}`}
                             className="rounded-circle me-2"
                             style={{ width: '32px', height: '32px', objectFit: 'cover' }}
