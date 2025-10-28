@@ -19,3 +19,4 @@ spotipy==2.24.0  # Pour l'intégration avec l'API Spotify
 # Dépendances pour les tests
 coverage==7.6.1
 better-profanity==0.7.0
+openai>=1.0.0
