@@ -1,8 +1,12 @@
 pipeline {
-    agent any
+    agent any  
 
     environment {
-        SONAR_TOKEN = credentials('scanner')  // Credential ID pour SonarQube token
+        SONAR_TOKEN = credentials('scanner')  // SonarQube token
+        registry = '192.168.33.10:8083'  // Nexus registry
+        registryCredentials = 'nexus'  // Credential ID pour Nexus
+        imageName = 'pixelette-app'  // Nom de l'image
+        imageTag = '1.0'  // Tag par défaut, ajusté avec BUILD_NUMBER
     }
 
     stages {
@@ -28,9 +32,11 @@ pipeline {
                 script {
                     echo "📦 Installation des dépendances Python..."
                     sh '''
-                        python -m pip install --upgrade pip
-                        pip install -r requirements.txt
-                        pip install coverage  # Pour les rapports de couverture
+                        # Vérifiez si pip3 est installé
+                        command -v pip3 >/dev/null 2>&1 || { echo "❌ pip3 non trouvé. Installez python3-pip."; exit 1; }
+                        python3 -m pip install --upgrade pip
+                        pip3 install -r requirements.txt
+                        pip3 install coverage
                     '''
                 }
             }
@@ -41,30 +47,18 @@ pipeline {
                 script {
                     echo "🧪 Exécution des tests Django (64 tests attendus)..."
                     sh '''
-                        # Créez un fichier .env pour les tests
                         [ -f .env ] || cat > .env << 'EOF'
 DJANGO_SETTINGS_MODULE=Pixelette.settings
 DATABASE_URL=sqlite://:memory:
 EOF
-
-                        # Migrations pour la base SQLite en mémoire
-                        python manage.py makemigrations --dry-run --verbosity 0
-                        python manage.py migrate --run-syncdb
-
-                        # Créez dossiers pour rapports
+                        python3 manage.py makemigrations --dry-run --verbosity 0
+                        python3 manage.py migrate --run-syncdb
                         mkdir -p build/reports/coverage build/reports/tests
-
-                        # Exécutez tests avec coverage
                         echo "🚀 Tests avec coverage..."
-                        coverage run manage.py test Pixelette.tests --verbosity 2 || true
-
-                        # Générez rapports XML pour SonarQube
+                        coverage run --source=Pixelette manage.py test Pixelette.tests --verbosity 2 || true
                         coverage xml --include="Pixelette/*" -o build/reports/coverage/coverage.xml
-
-                        # Vérifiez rapports
                         echo "📊 Vérification rapports:"
                         ls -la build/reports/ || true
-
                         if [ -f build/reports/coverage/coverage.xml ]; then
                             LINES=$(wc -l < build/reports/coverage/coverage.xml)
                             echo "✅ Coverage XML: ${LINES} lignes (pour SonarQube)"
@@ -79,7 +73,6 @@ EOF
             }
             post {
                 always {
-                    // Publiez les rapports (JUnit non généré par défaut avec Django, voir ci-dessous)
                     archiveArtifacts artifacts: 'build/reports/coverage/coverage.xml', allowEmptyArchive: true
                 }
                 success {
@@ -95,8 +88,8 @@ EOF
             steps {
                 script {
                     echo "🔍 Analyse SonarQube..."
-                    def scannerHome = tool 'SonarQube Scanner'  // Nom du tool dans Jenkins
-                    withSonarQubeEnv('SonarQube Server') {  // Nom de l'installation Sonar dans Jenkins
+                    def scannerHome = tool 'SonarQube Scanner'
+                    withSonarQubeEnv('SonarQube Server') {
                         timeout(time: 10, unit: 'MINUTES') {
                             sh """
                                 ${scannerHome}/bin/sonar-scanner \
@@ -118,13 +111,65 @@ EOF
             }
             post {
                 success {
-                    echo "✅ Analyse SonarQube réussie. Vérifiez le dashboard SonarQube."
+                    echo "✅ Analyse SonarQube réussie."
                     timeout(time: 10, unit: 'MINUTES') {
                         waitForQualityGate abortPipeline: true
                     }
                 }
                 failure {
                     echo "❌ Échec de l'analyse SonarQube."
+                }
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    echo "🐳 Construction de l'image Docker..."
+                    sh '''
+                        docker-compose build
+                        echo "🔍 Vérification image: ${imageName}:latest"
+                        docker images ${imageName} | grep latest || {
+                            echo "❌ Image ${imageName}:latest manquante!"
+                            exit 1
+                        }
+                    '''
+                }
+            }
+        }
+
+        stage('Deploy to Nexus') {
+            steps {
+                script {
+                    echo "📦 Déploiement vers Nexus (${registry})..."
+                    def imageTagFinal = env.BUILD_NUMBER ?: env.imageTag
+                    def fullImage = "${registry}/${imageName}:${imageTagFinal}"
+                    sh '''
+                        set -e
+                        echo "🔍 Vérification image: ${imageName}:latest"
+                        docker images ${imageName} | grep latest || {
+                            echo "❌ Image ${imageName}:latest manquante!"
+                            exit 1
+                        }
+                    '''
+                    withCredentials([usernamePassword(
+                        credentialsId: registryCredentials,
+                        usernameVariable: 'NEXUS_USER',
+                        passwordVariable: 'NEXUS_PASS'
+                    )]) {
+                        sh """
+                            echo "🔐 Login ${registry}..."
+                            echo "\${NEXUS_PASS}" | docker login ${registry} -u "\${NEXUS_USER}" --password-stdin
+                            echo "🏷️ Tag: ${fullImage}"
+                            docker tag ${imageName}:latest "${fullImage}"
+                            echo "🚀 Push ${fullImage}..."
+                            docker push "${fullImage}"
+                            docker logout ${registry}
+                            echo "🔒 Logout OK"
+                        """
+                    }
+                    env.DEPLOYED_IMAGE = fullImage
+                    echo "✅ Image déployée: ${fullImage}"
                 }
             }
         }
