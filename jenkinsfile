@@ -113,47 +113,50 @@ EOF
                 }
             }
         }
+stage('SonarQube Analysis') {
+    steps {
+        script {
+            echo "🔍 Analyse SonarQube..."
+            // Nom exact configuré dans "Manage Jenkins → Tools → SonarQube Scanner installations"
+            def scannerHome = tool 'scanner'
 
-        stage('SonarQube Analysis') {
-            steps {
-                script {
-                    echo "🔍 Analyse SonarQube..."
-                    def scannerHome = tool 'SonarQube Scanner'
-                    withSonarQubeEnv('SonarQube Server') {
-                        timeout(time: 10, unit: 'MINUTES') {
-                            sh """
-                                # Activate virtual environment
-                                . venv/bin/activate
-                                export NLTK_DATA=/tmp/nltk_data
-                                ${scannerHome}/bin/sonar-scanner \
-                                    -Dsonar.projectKey=pixelette \
-                                    -Dsonar.projectName=Pixelette \
-                                    -Dsonar.host.url=http://192.168.33.10:9000 \
-                                    -Dsonar.login=${SONAR_TOKEN} \
-                                    -Dsonar.sources=Pixelette \
-                                    -Dsonar.tests=Pixelette/tests \
-                                    -Dsonar.python.coverage.reportPaths=build/reports/coverage/coverage.xml \
-                                    -Dsonar.python.file.suffixes=py \
-                                    -Dsonar.exclusions=**/migrations/**,**/static/**,**/media/**,**/admin/** \
-                                    -Dsonar.sourceEncoding=UTF-8 \
-                                    -Dsonar.verbose=true
-                            """
-                        }
-                    }
-                }
-            }
-            post {
-                success {
-                    echo "✅ Analyse SonarQube réussie."
-                    timeout(time: 10, unit: 'MINUTES') {
-                        waitForQualityGate abortPipeline: true
-                    }
-                }
-                failure {
-                    echo "❌ Échec de l'analyse SonarQube."
+            // Nom exact configuré dans "Manage Jenkins → System → SonarQube servers"
+            withSonarQubeEnv('sonarqube') {
+                timeout(time: 10, unit: 'MINUTES') {
+                    sh """
+                        # Activate virtual environment
+                        . venv/bin/activate
+                        export NLTK_DATA=/tmp/nltk_data
+
+                        ${scannerHome}/bin/sonar-scanner \
+                            -Dsonar.projectKey=pixelette \
+                            -Dsonar.projectName=Pixelette \
+                            -Dsonar.host.url=http://192.168.33.10:9000 \
+                            -Dsonar.sources=Pixelette \
+                            -Dsonar.tests=Pixelette/tests \
+                            -Dsonar.python.coverage.reportPaths=build/reports/coverage/coverage.xml \
+                            -Dsonar.python.file.suffixes=py \
+                            -Dsonar.exclusions=**/migrations/**,**/static/**,**/media/**,**/admin/** \
+                            -Dsonar.sourceEncoding=UTF-8 \
+                            -Dsonar.verbose=true
+                    """
                 }
             }
         }
+    }
+    post {
+        success {
+            echo "✅ Analyse SonarQube réussie."
+            timeout(time: 10, unit: 'MINUTES') {
+                waitForQualityGate abortPipeline: true
+            }
+        }
+        failure {
+            echo "❌ Échec de l'analyse SonarQube."
+        }
+    }
+}
+
 
         stage('Build Docker Image') {
             steps {
