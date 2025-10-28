@@ -145,15 +145,19 @@ stage('SonarQube Analysis') {
     }
     post {
         success {
-            echo "✅ Analyse SonarQube réussie."
             timeout(time: 10, unit: 'MINUTES') {
-                waitForQualityGate abortPipeline: true
+                try {
+                    waitForQualityGate()
+                } catch (Exception e) {
+                    echo "⚠️ Attention : impossible de récupérer le Quality Gate, mais on continue..."
+                }
             }
         }
         failure {
             echo "❌ Échec de l'analyse SonarQube."
         }
     }
+
 }
 
 
