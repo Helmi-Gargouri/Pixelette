@@ -13,3 +13,4 @@ better-profanity==0.7.0  # Remplacement de profanity-check
 python-decouple==3.8
 dj-database-url
 django-cors-headers==3.14.0  # Pour gérer les requêtes CORS
+numpy==1.26.4  # Pour l'analyse des couleurs
