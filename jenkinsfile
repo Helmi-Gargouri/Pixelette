@@ -28,24 +28,26 @@ pipeline {
         }
 
 stage('Install Python Dependencies') {
-            steps {
-                script {
-                    echo "📦 Installation des dépendances Python..."
-                    sh '''
-                        # Installez python3-venv si nécessaire
-                        command -v pip3 >/dev/null 2>&1 || { echo "❌ pip3 non trouvé. Installez python3-pip."; exit 1; }
-                        sudo apt-get update
-                        sudo apt-get install -y python3.10-venv
-                        # Créez et activez un environnement virtuel
-                        python3 -m venv venv
-                        . venv/bin/activate
-                        pip install --upgrade pip
-                        pip install -r requirements.txt
-                        pip install coverage
-                    '''
+    steps {
+        script {
+            echo "📦 Installation des dépendances Python..."
+            sh '''
+                # Vérification pip3
+                command -v pip3 >/dev/null 2>&1 || { 
+                    echo "❌ pip3 non trouvé. Installez python3-pip sur l'agent."; 
+                    exit 1; 
                 }
-            }
+                
+                # Créez et activez un environnement virtuel
+                python3 -m venv venv
+                . venv/bin/activate
+                pip install --upgrade pip
+                pip install -r requirements.txt
+                pip install coverage
+            '''
         }
+    }
+}
 
         stage('Run Tests') {
             steps {
