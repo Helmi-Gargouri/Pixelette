@@ -115,7 +115,7 @@ const OeuvreAIGenerator = () => {
       data.append('auteur', user.id)
       data.append('image', blob, 'ai-generated.png')
 
-      await axios.post('http://localhost:8000/api/oeuvres/', data, {
+      await axios.post(`${API_BASE}/oeuvres/`, data, {
         withCredentials: true,
         headers: {
           Authorization: `Token ${token}`,
