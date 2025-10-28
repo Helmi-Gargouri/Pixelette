@@ -19,6 +19,7 @@ python manage.py migrate sessions
 
 echo "🗄️ Migration de l'app Pixelette..."
 # Si vous avez des conflits, fake la migration problématique d'abord
+python manage.py migrate Pixelette 0015_interaction_filtered_content_and_more --fake
 python manage.py migrate Pixelette 0013_alter_interaction_unique_together_and_more --fake
 python manage.py migrate Pixelette 0014_interaction_parent --fake
 # Puis migrer normalement
