@@ -11,5 +11,3 @@ qrcode==7.4.2  # Pour générer des QR codes
 coverage==7.6.1  # Pour les rapports de couverture
 better-profanity==0.7.0  # Remplacement de profanity-check
 
-# Dépendances facultatives pour CI/CD
-django-test-junit==0.1.1  # Optionnel : pour générer des rapports JUnit
