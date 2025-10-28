@@ -55,46 +55,105 @@ stage('Install Python Dependencies') {
     }
 }
 
-        stage('Run Tests') {
+stage('Run Tests') {
             steps {
                 script {
                     echo "🧪 Exécution des tests Django (64 tests attendus)..."
                     sh '''
+                        set -e  # Arrêter en cas d'erreur
+                        
                         # Activez l'environnement virtuel
                         . venv/bin/activate
-                        [ -f .env ] || cat > .env << 'EOF'
+                        
+                        # Vérifier que Django est installé
+                        echo "🔍 Vérification de l'installation Django..."
+                        python -c "import django; print(f'Django version: {django.get_version()}')" || {
+                            echo "❌ Django n'est pas installé correctement"
+                            exit 1
+                        }
+                        
+                        # Créer le fichier .env si nécessaire
+                        if [ ! -f .env ]; then
+                            echo "📝 Création du fichier .env..."
+                            cat > .env << 'EOF'
 DJANGO_SETTINGS_MODULE=Pixelette.settings
 DATABASE_URL=sqlite://:memory:
-EOF
-                        python manage.py makemigrations --dry-run --verbosity 0
-                        python manage.py migrate --run-syncdb
-                        mkdir -p build/reports/coverage build/reports/tests
-                        echo "🚀 Tests avec coverage..."
-                        coverage run --source=Pixelette manage.py test Pixelette.tests --verbosity 2 || true
-                        coverage xml --include="Pixelette/*" -o build/reports/coverage/coverage.xml
-                        echo "📊 Vérification rapports:"
-                        ls -la build/reports/ || true
-                        if [ -f build/reports/coverage/coverage.xml ]; then
-                            LINES=$(wc -l < build/reports/coverage/coverage.xml)
-                            echo "✅ Coverage XML: ${LINES} lignes (pour SonarQube)"
-                        else
-                            echo "❌ Coverage XML manquant - génération fallback"
-                            cat > build/reports/coverage/coverage.xml << 'EOF'
-<?xml version="1.0"?><coverage><metrics files="1" loc="100"/></coverage>
+SECRET_KEY=test-secret-key-for-ci
+DEBUG=False
+ALLOWED_HOSTS=localhost,127.0.0.1
 EOF
                         fi
+                        
+                        # Exporter les variables d'environnement
+                        export DJANGO_SETTINGS_MODULE=Pixelette.settings
+                        export SECRET_KEY=test-secret-key-for-ci
+                        export DEBUG=False
+                        
+                        # Vérifier manage.py
+                        if [ ! -f manage.py ]; then
+                            echo "❌ manage.py introuvable!"
+                            ls -la
+                            exit 1
+                        fi
+                        
+                        echo "🔧 Vérification des migrations..."
+                        python manage.py makemigrations --dry-run --verbosity 1 --check || {
+                            echo "⚠️ Migrations non appliquées détectées"
+                        }
+                        
+                        echo "🗃️ Migration de la base de données..."
+                        python manage.py migrate --run-syncdb --verbosity 1
+                        
+                        # Créer les répertoires pour les rapports
+                        mkdir -p build/reports/coverage build/reports/tests
+                        
+                        echo "🚀 Exécution des tests avec coverage..."
+                        set +e  # Ne pas arrêter si les tests échouent
+                        coverage run --source=Pixelette manage.py test Pixelette.tests --verbosity 2
+                        TEST_EXIT_CODE=$?
+                        set -e
+                        
+                        echo "📊 Génération du rapport de couverture..."
+                        coverage xml --include="Pixelette/*" -o build/reports/coverage/coverage.xml || {
+                            echo "⚠️ Erreur lors de la génération du rapport XML"
+                        }
+                        
+                        coverage report --include="Pixelette/*" || echo "⚠️ Rapport texte non disponible"
+                        
+                        echo "📊 Vérification des rapports générés:"
+                        ls -lah build/reports/coverage/ || true
+                        
+                        if [ -f build/reports/coverage/coverage.xml ]; then
+                            LINES=$(wc -l < build/reports/coverage/coverage.xml)
+                            SIZE=$(du -h build/reports/coverage/coverage.xml | cut -f1)
+                            echo "✅ Coverage XML généré: ${LINES} lignes, ${SIZE}"
+                            head -n 5 build/reports/coverage/coverage.xml
+                        else
+                            echo "❌ Coverage XML manquant - génération d'un fallback"
+                            cat > build/reports/coverage/coverage.xml << 'EOF'
+<?xml version="1.0"?><coverage version="1.0"><metrics files="1" loc="100"/></coverage>
+EOF
+                        fi
+                        
+                        # Retourner le code de sortie des tests
+                        if [ $TEST_EXIT_CODE -ne 0 ]; then
+                            echo "⚠️ Les tests ont échoué avec le code: $TEST_EXIT_CODE"
+                            exit $TEST_EXIT_CODE
+                        fi
+                        
+                        echo "✅ Tous les tests sont passés!"
                     '''
                 }
             }
             post {
                 always {
-                    archiveArtifacts artifacts: 'build/reports/coverage/coverage.xml', allowEmptyArchive: true
+                    archiveArtifacts artifacts: 'build/reports/coverage/**/*', allowEmptyArchive: true
                 }
                 success {
-                    echo "✅ Tous les tests sont passés !"
+                    echo "✅ Tous les tests sont passés avec succès !"
                 }
                 failure {
-                    echo "❌ Échec des tests (4 failures, 1 error restants). Vérifiez les logs."
+                    echo "❌ Échec des tests. Vérifiez les logs ci-dessus pour plus de détails."
                 }
             }
         }
