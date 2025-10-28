@@ -522,63 +522,8 @@ class GalerieViewSet(viewsets.ModelViewSet):
     serializer_class = GalerieSerializer
     permission_classes = [AllowAny]
    
-    @action(detail=True, methods=['get'], permission_classes=[AllowAny])
-    def generate_spotify_playlist(self, request, pk=None):
-        """
-        Génère une playlist Spotify basée sur le thème de la galerie.
-        """
-        try:
-            galerie = self.get_object()
-            
-            # Génère la playlist
-            result = generate_playlist_for_gallery(
-                galerie_nom=galerie.nom,
-                galerie_theme=galerie.theme or 'Art',
-                galerie_description=galerie.description or ''
-            )
-            
-            if result['success']:
-                return Response(result, status=status.HTTP_200_OK)
-            else:
-                return Response(
-                    {'error': result.get('message', 'Erreur lors de la génération de la playlist')},
-                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
-                )
-                
-        except Galerie.DoesNotExist:
-            return Response({'error': 'Galerie non trouvée'}, status=status.HTTP_404_NOT_FOUND)
-        except Exception as e:
-            return Response(
-                {'error': f'Erreur: {str(e)}'},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-    
-    @action(detail=True, methods=['get'], permission_classes=[AllowAny])
-    def search_spotify_playlists(self, request, pk=None):
-        """
-        Recherche des playlists Spotify existantes basées sur le thème de la galerie.
-        """
-        try:
-            galerie = self.get_object()
-            theme = galerie.theme or galerie.nom
-            
-            result = search_playlists_by_theme(theme, limit=10)
-            
-            if result['success']:
-                return Response(result, status=status.HTTP_200_OK)
-            else:
-                return Response(
-                    {'error': result.get('message', 'Erreur lors de la recherche')},
-                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
-                )
-                
-        except Galerie.DoesNotExist:
-            return Response({'error': 'Galerie non trouvée'}, status=status.HTTP_404_NOT_FOUND)
-        except Exception as e:
-            return Response(
-                {'error': f'Erreur: {str(e)}'},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+
+
     
     def retrieve(self, request, *args, **kwargs):
         galerie = self.get_object()
