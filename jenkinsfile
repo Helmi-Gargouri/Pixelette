@@ -1,10 +1,6 @@
 pipeline {
     agent any  
 
-    options {
-        timeout(time: 20, unit: 'MINUTES')  
-        retry(2)  
-    }
 
     environment {
         SONAR_TOKEN = credentials('scanner') 
@@ -178,43 +174,48 @@ stage('SonarQube Analysis') {
             }
         }
 
-        stage('Deploy to Nexus') {
-            steps {
-                script {
-                    echo "📦 Déploiement vers Nexus (${registry})..."
-                    def imageTagFinal = env.BUILD_NUMBER ?: env.imageTag
-                    def fullImage = "${registry}/${imageName}:${imageTagFinal}"
-                    sh '''
-                        set -e
-                        echo "🔍 Vérification image: ${imageName}:latest"
-                        docker images ${imageName} | grep latest || {
-                            echo "❌ Image ${imageName}:latest manquante!"
-                            exit 1
-                        }
-                    '''
-                    withCredentials([usernamePassword(
-                        credentialsId: registryCredentials,
-                        usernameVariable: 'NEXUS_USER',
-                        passwordVariable: 'NEXUS_PASS'
-                    )]) {
-                        sh """
-                            echo "🔐 Login ${registry}..."
-                            echo "\${NEXUS_PASS}" | docker login ${registry} -u "\${NEXUS_USER}" --password-stdin
-                            echo "🏷️ Tag: ${fullImage}"
-                            docker tag ${imageName}:latest "${fullImage}"
-                            echo "🚀 Push ${fullImage}pocket
+ stage('Deploy to Nexus') {
+    steps {
+        script {
+            echo "📦 Déploiement vers Nexus (${registry})..."
+            def imageTagFinal = env.BUILD_NUMBER ?: env.imageTag
+            def fullImage = "${registry}/${imageName}:${imageTagFinal}"
 
-                            echo "🚀 Push ${fullImage}..."
-                            docker push "${fullImage}"
-                            docker logout ${registry}
-                            echo "🔒 Logout OK"
-                        """
-                    }
-                    env.DEPLOYED_IMAGE = fullImage
-                    echo "✅ Image déployée: ${fullImage}"
+            sh """
+                set -e
+                echo "🔍 Vérification image: ${imageName}:latest"
+                docker images ${imageName} | grep latest || {
+                    echo "❌ Image ${imageName}:latest manquante!"
+                    exit 1
                 }
+            """
+
+            withCredentials([usernamePassword(
+                credentialsId: registryCredentials,
+                usernameVariable: 'NEXUS_USER',
+                passwordVariable: 'NEXUS_PASS'
+            )]) {
+                sh """
+                    echo "🔐 Login ${registry}..."
+                    echo "\${NEXUS_PASS}" | docker login ${registry} -u "\${NEXUS_USER}" --password-stdin
+
+                    echo "🏷️ Tag: ${fullImage}"
+                    docker tag ${imageName}:latest "${fullImage}"
+
+                    echo "🚀 Push ${fullImage}..."
+                    docker push "${fullImage}"
+
+                    docker logout ${registry}
+                    echo "🔒 Logout OK"
+                """
             }
+
+            env.DEPLOYED_IMAGE = fullImage
+            echo "✅ Image déployée: ${fullImage}"
         }
+    }
+}
+
     }
 
     post {
