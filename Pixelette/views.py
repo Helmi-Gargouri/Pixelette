@@ -708,8 +708,10 @@ class UtilisateurViewSet(viewsets.ModelViewSet):
         except Utilisateur.DoesNotExist:
             return Response({'error': 'Email non trouvé.'}, status=400)
         
-    @action(detail=False, methods=['get'], permission_classes=[AllowAny])
-    def artistes(self, request):
+    @action(detail=False, methods=['get'], url_path='artistes')
+    def artistes(self, request, *args, **kwargs):
+    # Handle unauthenticated (minimal addition)
+        user_suivis = Suivi.objects.filter(utilisateur=request.user).values_list('artiste_id', flat=True) if request.user and request.user.is_authenticated else []
         """Liste tous les utilisateurs ayant le rôle 'artiste'"""
         artistes = Utilisateur.objects.filter(role='artiste')
         serializer = self.get_serializer(artistes, many=True, context={'request': request})

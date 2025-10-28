@@ -45,21 +45,18 @@ class UtilisateurSerializer(serializers.ModelSerializer):
         validated_data.pop('two_factor_enabled', None)
         return super().update(instance, validated_data)
     
+
     def to_representation(self, instance):
         representation = super().to_representation(instance)
         if instance.image:
-            request = self.context.get('request')
             try:
-                if request:
-                    representation['image'] = request.build_absolute_uri(instance.image.url)
-                else:
-                    representation['image'] = instance.image.url
+                # Cloudinary donne URL absolue → pas besoin de build_absolute_uri
+                representation['image'] = instance.image.url  # ex: https://res.cloudinary.com/...
             except Exception:
-                # Si l'image n'existe pas (fichier supprimé sur Render), utiliser un avatar par défaut
+                # Fallback si image manquante
                 nom_complet = f"{instance.prenom} {instance.nom}"
                 representation['image'] = f"https://ui-avatars.com/api/?name={nom_complet}&background=random&size=200"
         else:
-            # Pas d'image définie, utiliser un avatar par défaut
             nom_complet = f"{instance.prenom} {instance.nom}"
             representation['image'] = f"https://ui-avatars.com/api/?name={nom_complet}&background=random&size=200"
         return representation

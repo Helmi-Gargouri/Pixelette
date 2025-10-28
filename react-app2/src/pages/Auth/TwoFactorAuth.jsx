@@ -6,7 +6,7 @@ import { useAuth } from '../../context/AuthContext';
 const TwoFactorAuth = () => {
   const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
   const MEDIA_BASE = import.meta.env.VITE_MEDIA_URL || 'http://localhost:8000';
-const BACKOFFICE_URL = import.meta.env.VITE_BACKOFFICE_URL || 'http://localhost:5174';
+  const BACKOFFICE_URL = import.meta.env.VITE_BACKOFFICE_URL || 'http://localhost:5174';
   const [verificationCode, setVerificationCode] = useState(['', '', '', '', '', '']);
   const [qrCode, setQrCode] = useState('');
   const [error, setError] = useState(null);

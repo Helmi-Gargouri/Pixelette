@@ -6,6 +6,9 @@ from pathlib import Path
 from decouple import config
 import os
 import dj_database_url
+import cloudinary
+import cloudinary.uploader
+import cloudinary.api
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -139,8 +142,8 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # REST Framework Configuration
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework.authentication.TokenAuthentication',  # ✅ DRF Standard
-        'rest_framework.authentication.SessionAuthentication',  # ✅ DRF Standard
+        'Pixelette.authentication.UtilisateurTokenAuthentication',  # Change: Use custom token auth (returns Utilisateur)
+        'Pixelette.authentication.UtilisateurSessionAuthentication',  # Change: Use custom session auth (returns Utilisateur)
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.AllowAny',  # ✅ Par défaut : public
@@ -281,3 +284,16 @@ LOGGING = {
         },
     },
 }
+
+cloudinary.config(
+    cloud_name=os.environ.get('CLOUDINARY_CLOUD_NAME'),
+    api_key=os.environ.get('CLOUDINARY_API_KEY'),
+    api_secret=os.environ.get('CLOUDINARY_API_SECRET'),
+    secure=True  # HTTPS
+)
+
+# Utilise Cloudinary comme storage par défaut pour fichiers (images, etc.)
+DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
+
+# Optionnel : pour uploads directs depuis frontend (si tu en as)
+CLOUDINARY_UPLOAD_PRESET = os.environ.get('CLOUDINARY_UPLOAD_PRESET', 'pixelette_unsigned')  # Ton preset unsigned

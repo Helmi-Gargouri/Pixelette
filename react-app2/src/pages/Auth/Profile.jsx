@@ -318,9 +318,7 @@ const getScoreColor = (percentage) => {
       });
       setModal({ show: true, title: 'Succès !', message: 'Image mise à jour !', type: 'success' });
       updateUser(response.data);
-const imageUrl = response.data.image.startsWith('http') 
-  ? response.data.image 
-  : `${MEDIA_BASE}${response.data.image}`;
+const imageUrl = response.data.image;
       setImagePreview(imageUrl);
       setIsLocalPreview(false);
       setSelectedImage(null);
