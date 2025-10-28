@@ -140,26 +140,25 @@ stage('SonarQube Analysis') {
                     """
                 }
             }
-
         }
     }
-post {
-    success {
-        echo "✅ Analyse SonarQube terminée (les métriques ne bloquent pas le pipeline)."
-        timeout(time: 10, unit: 'MINUTES') {
-            try {
-                waitForQualityGate()  // Sans abortPipeline, le pipeline continue quoi qu'il arrive
-            } catch (Exception e) {
-                echo "⚠️ Attention : impossible de récupérer le Quality Gate, mais on continue..."
+    post {
+        success {
+            script {
+                echo "✅ Analyse SonarQube terminée (les métriques ne bloquent pas le pipeline)."
+                timeout(time: 10, unit: 'MINUTES') {
+                    try {
+                        waitForQualityGate()
+                    } catch (Exception e) {
+                        echo "⚠️ Attention : impossible de récupérer le Quality Gate, mais on continue..."
+                    }
+                }
             }
         }
+        failure {
+            echo "❌ Échec de l'analyse SonarQube."
+        }
     }
-    failure {
-        echo "❌ Échec de l'analyse SonarQube."
-    }
-}
-
-
 }
 
 
