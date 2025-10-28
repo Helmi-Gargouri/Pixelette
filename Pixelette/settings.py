@@ -174,7 +174,7 @@ CORS_ALLOWED_ORIGINS = [
 if not DEBUG:
     CORS_ALLOWED_ORIGINS.extend([
         "https://pixelette.onrender.com",
-        "https://pixelette-backoffice.onrender.com",
+        "https://pixelette-backofficce.onrender.com",
     ])
 
 # ✅ Configuration CORS complète

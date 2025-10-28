@@ -13,7 +13,7 @@ class CorsMiddleware:
         self.get_response = get_response
         self.allowed_origins = [
             'https://pixelette.onrender.com',
-            'https://pixelette-backoffice.onrender.com',
+            'https://pixelette-backofficce.onrender.com',
             'http://localhost:5173',
             'http://127.0.0.1:5173',
             'http://localhost:5174',
