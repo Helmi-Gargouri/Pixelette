@@ -44,7 +44,7 @@ class Utilisateur(models.Model):
         ('artiste', 'Artiste'),
         ('admin', 'Admin'),
     ]
-    role = models.CharField(max_length=10, choices=ROLE_CHOICES, default='admin', verbose_name="Rôle")
+    role = models.CharField(max_length=10, choices=ROLE_CHOICES, default='user', verbose_name="Rôle")
 
     def __str__(self):
         return f"{self.prenom} {self.nom}"

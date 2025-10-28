@@ -268,62 +268,80 @@ class UtilisateurViewSet(viewsets.ModelViewSet):
     permission_classes = [AllowAny]  
 
     def get_permissions(self):
-        """
-        Définir les permissions selon l'action
-        """
+        """Définir les permissions selon l'action"""
         print(f"🔍 get_permissions appelé pour action: {self.action}")
         
-        # ✅ Actions PUBLIQUES (pas d'authentification requise)
+        # ✅ Actions PUBLIQUES
         public_actions = [
-            'create',           # Inscription
-            'login',            # Connexion
-            'logout',           # Déconnexion
-            'generate_2fa',     # Génération 2FA
-            'enable_2fa',       # Activation 2FA
-            'verify_2fa',       # Vérification 2FA
-            'disable_2fa',      # Désactivation 2FA
-            'get_2fa_qr',       # QR code 2FA
-            'forgot_password',  # Mot de passe oublié
-            'verify_code',      # Vérification code reset
-            'reset_password_code',  # Reset password
-            'request_password_reset',
-            'count',            # Compteur utilisateurs
-            'artistes',         # Liste des artistes
-            'restore_session',  # Restauration session
-            'demander_artiste', # Demande rôle artiste
-            'statut_demande',   # Statut demande
-            'list',             # ✅ AJOUT : Liste des utilisateurs (publique)
+            'create', 'login', 'logout', 'generate_2fa', 'enable_2fa',
+            'verify_2fa', 'disable_2fa', 'get_2fa_qr', 'forgot_password',
+            'verify_code', 'reset_password_code', 'request_password_reset',
+            'count', 'artistes', 'restore_session', 'demander_artiste',
+            'statut_demande', 'list',
         ]
         
         if self.action in public_actions:
-            permission_classes = [AllowAny]
             print(f"✅ Permission AllowAny pour {self.action}")
+            return [AllowAny()]
         
-        # ✅ Actions ADMIN UNIQUEMENT
+        # ✅ Actions ADMIN
         elif self.action in ['assign_role', 'recalculer_tous_scores', 'dashboard_artiste_potential']:
-            permission_classes = [IsAdmin]
             print(f"✅ Permission IsAdmin pour {self.action}")
+            return [IsAdmin()]
         
-        # ✅ Actions AUTHENTIFIÉES (utilisateurs connectés)
-        elif self.action in [
-            'profile',
-            'mon_score_artiste',
-            'retrieve',         # Détail utilisateur
-            'update',           # Modifier utilisateur
-            'partial_update',   # Modifier partiellement
-            'destroy',          # Supprimer utilisateur
-            'request_artist_role',
-        ]:
-            permission_classes = [IsAuthenticated]
+        # ✅ Actions AUTHENTIFIÉES
+        elif self.action in ['profile', 'mon_score_artiste', 'retrieve', 
+                             'update', 'partial_update', 'destroy', 'request_artist_role']:
             print(f"✅ Permission IsAuthenticated pour {self.action}")
+            return [IsAuthenticated()]
         
-        # ✅ Défaut : Admin ou Session (pour actions non listées)
-        else:
-            permission_classes = [IsAdminOrSession]
-            print(f"⚠️ Permission IsAdminOrSession pour {self.action}")
-        
-        return [permission() for permission in permission_classes]
+        # ✅ Défaut
+        print(f"⚠️ Permission IsAdminOrSession pour {self.action}")
+        return [IsAdminOrSession()]
     
+    def create(self, request, *args, **kwargs):
+        """Override create pour gérer les erreurs proprement"""
+        try:
+            # Création normale
+            serializer = self.get_serializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            self.perform_create(serializer)
+            
+            headers = self.get_success_headers(serializer.data)
+            
+            # ✅ Retourner une réponse réussie
+            return Response(
+                {
+                    'message': 'Utilisateur créé avec succès',
+                    'user': serializer.data
+                },
+                status=status.HTTP_201_CREATED,
+                headers=headers
+            )
+        except Exception as e:
+            print(f"❌ Erreur lors de la création: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            
+            # Si l'utilisateur a été créé malgré l'erreur, le récupérer
+            email = request.data.get('email')
+            if email:
+                try:
+                    user = Utilisateur.objects.get(email=email)
+                    serializer = self.get_serializer(user)
+                    return Response(
+                        {
+                            'message': 'Utilisateur créé (avec avertissement)',
+                            'user': serializer.data,
+                            'warning': str(e)
+                        },
+                        status=status.HTTP_201_CREATED
+                    )
+                except Utilisateur.DoesNotExist:
+                    pass
+            
+            raise
+
     @action(detail=False, methods=['get'], permission_classes=[AllowAny])
     def count(self, request):
         """Compte le nombre total d'utilisateurs - accessible à tous"""
