@@ -18,9 +18,9 @@ const Home = () => {
                 <div className="col-lg-8 col-md-12">
                   <div className="hero-style1">
                     <h1 className="hero-title" data-ani="slider-custom-anim-right" data-ani-delay="0.15s">
-                      PIXELETTE <span className="text-stroke">Pixelette</span>
+                      PIXELETTE <span className="text-stroke">PIXELETTE</span>
                     </h1>
-        
+                  
                     <h1 className="hero-title title-bg-thumb" data-bg-src="/assets/img/hero/hero_1_text-bg.png" data-ani="slider-custom-anim-right" data-ani-delay="0.25s">
                       Le monde de l'art
                     </h1>
