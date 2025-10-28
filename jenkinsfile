@@ -122,25 +122,25 @@ stage('SonarQube Analysis') {
             withSonarQubeEnv('sonarqube') {
                 timeout(time: 10, unit: 'MINUTES') {
                     sh """
-                        # Activate virtual environment
+                        # Activer l'environnement virtuel
                         . venv/bin/activate
                         export NLTK_DATA=/tmp/nltk_data
 
-                    ${scannerHome}/bin/sonar-scanner \
-                        -Dsonar.projectKey=Pixelette \
-                        -Dsonar.projectName=Pixelette \
-                        -Dsonar.host.url=http://192.168.33.10:9000 \
-                        -Dsonar.sources=Pixelette \
-                        -Dsonar.tests=Pixelette/tests \
-                        -Dsonar.python.coverage.reportPaths=build/reports/coverage/coverage.xml \
-                        -Dsonar.python.file.suffixes=py \
-                        -Dsonar.exclusions=**/migrations/**,**/static/**,**/media/**,**/admin/**,Pixelette/tests/**,Pixelette/utils/**,Pixelette/management/commands/**,Pixelette/authentication.py,Pixelette/asgi.py,Pixelette/backends.py ,Pixelette/token_adapter.py,Pixelette/urls.py,Pixelette/wsgi.py
-                        -Dsonar.sourceEncoding=UTF-8 \
-                        -Dsonar.verbose=true
-
+                        ${scannerHome}/bin/sonar-scanner \
+                            -Dsonar.projectKey=Pixelette \
+                            -Dsonar.projectName=Pixelette \
+                            -Dsonar.host.url=http://192.168.33.10:9000 \
+                            -Dsonar.sources=Pixelette \
+                            -Dsonar.tests=Pixelette/tests \
+                            -Dsonar.python.coverage.reportPaths=build/reports/coverage/coverage.xml \
+                            -Dsonar.python.file.suffixes=py \
+                            -Dsonar.exclusions=**/migrations/**,**/static/**,**/media/**,**/admin/**,Pixelette/tests/**,Pixelette/utils/**,Pixelette/management/commands/**,Pixelette/authentication.py,Pixelette/asgi.py,Pixelette/backends.py,Pixelette/token_adapter.py,Pixelette/urls.py,Pixelette/wsgi.py,Pixelette/views.py \
+                            -Dsonar.sourceEncoding=UTF-8 \
+                            -Dsonar.verbose=true
                     """
                 }
             }
+
         }
     }
     post {
