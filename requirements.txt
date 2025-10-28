@@ -15,7 +15,7 @@ textblob==0.18.0.post0  # Pour le traitement du langage naturel
 langdetect==1.0.9  # Pour la détection de langue
 scikit-learn==1.5.2  # Pour l'apprentissage automatique
 joblib==1.4.2  # Pour la sérialisation et le traitement parallèle
-
+spotipy==2.24.0  # Pour l'intégration avec l'API Spotify
 # Dépendances pour les tests
 coverage==7.6.1
 better-profanity==0.7.0
