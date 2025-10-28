@@ -34,11 +34,17 @@ stage('Install Python Dependencies') {
             sh '''
                 # Vérification pip3
                 command -v pip3 >/dev/null 2>&1 || { 
-                    echo "❌ pip3 non trouvé. Installez python3-pip sur l'agent."; 
+                    echo "❌ pip3 non trouvé."; 
                     exit 1; 
                 }
                 
-                # Créez et activez un environnement virtuel
+                # Vérifier si venv est disponible
+                if ! python3 -m venv --help > /dev/null 2>&1; then
+                    echo "⚠️ python3-venv n'est pas installé. Contactez l'administrateur."
+                    exit 1
+                fi
+                
+                # Créer et activer l'environnement virtuel
                 python3 -m venv venv
                 . venv/bin/activate
                 pip install --upgrade pip
