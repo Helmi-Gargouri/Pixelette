@@ -1,0 +1,15 @@
+# Dépendances du projet
+Django==5.1.2  # Dernière version stable de Django
+djangorestframework==3.15.2  # Pour REST API
+pyotp==2.9.0  # Pour l'authentification 2FA
+Pillow==10.4.0  # Pour la gestion des images
+psycopg2-binary==2.9.9  # Pour PostgreSQL (si utilisé en prod)
+requests==2.32.3  # Pour les appels HTTP (ex. dans views.py)
+qrcode==7.4.2  # Pour générer des QR codes
+
+# Dépendances pour les tests
+coverage==7.6.1  # Pour les rapports de couverture
+better-profanity==0.7.0  # Remplacement de profanity-check
+
+# Dépendances facultatives pour CI/CD
+django-test-junit==0.1.1  # Optionnel : pour générer des rapports JUnit
