@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';  // Add useSearchParams
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import { Loader2, Upload, Save, X, Trash2 } from 'lucide-react';
-import { useAuth } from '../../context/AuthContext'; // Ajouté
+import { useAuth } from '../../context/AuthContext';
 
 const Profile = () => {
-  const { updateUser } = useAuth(); // Ajouté
+  const { updateUser } = useAuth();
+  const [searchParams] = useSearchParams();  // Add this
   const [user, setUser] = useState(null);
   const [editing, setEditing] = useState(false);
   const [formData, setFormData] = useState({ prenom: '', nom: '', telephone: '' });
@@ -14,12 +15,32 @@ const Profile = () => {
   const [selectedImage, setSelectedImage] = useState(null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
-  const [isEnabling2FA, setIsEnabling2FA] = useState(false); // Ajouté
-  const [isDisabling2FA, setIsDisabling2FA] = useState(false); // Ajouté
+  const [isEnabling2FA, setIsEnabling2FA] = useState(false);
+  const [isDisabling2FA, setIsDisabling2FA] = useState(false);
   const fileInputRef = useRef(null);
   const navigate = useNavigate();
+  const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';  // Add this if not present
 
   useEffect(() => {
+    const tempId = searchParams.get('temp_id');
+
+    if (tempId) {
+      axios.get(`${API_BASE}/auth/exchange_temp/?temp_id=${tempId}`)
+        .then(res => {
+          const { token, user } = res.data;
+          localStorage.setItem('token', token);
+          localStorage.setItem('user', JSON.stringify(user));
+          updateUser?.(user);
+          navigate('/profile', { replace: true });
+        })
+        .catch(err => {
+          console.error('Erreur échange temp_id', err);
+          toast.error('Échec de l’authentification admin');
+          navigate('/login');
+        });
+      return;
+    }
+
     const token = localStorage.getItem('token');
     const storedUser = localStorage.getItem('user');
 
@@ -41,12 +62,12 @@ const Profile = () => {
     }
 
     fetchProfile(token);
-  }, [navigate]);
+  }, [navigate, searchParams, updateUser]);
 
   const fetchProfile = async (token) => {
-    setLoading(true);
+setLoading(true);
     try {
-      const response = await axios.get('http://localhost:8000/api/utilisateurs/profile/', {
+      const response = await axios.get(`${API_BASE}/utilisateurs/profile/`, {  // Change to API_BASE
         headers: { Authorization: `Token ${token}` },
         withCredentials: true,
       });
@@ -95,7 +116,7 @@ const Profile = () => {
       const form = new FormData();
       form.append('image', selectedImage);
 
-      const response = await axios.patch(`http://localhost:8000/api/utilisateurs/${user.id}/`, form, {
+      const response = await axios.patch(`${API_BASE}/utilisateurs/${user.id}/`, form, {
         headers: {
           Authorization: `Token ${token}`,
           'Content-Type': 'multipart/form-data',
@@ -125,7 +146,7 @@ const Profile = () => {
     setUpdating(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.patch(`http://localhost:8000/api/utilisateurs/${user.id}/`, formData, {
+      const response = await axios.patch(`${API_BASE}/utilisateurs/${user.id}/`, formData, {
         headers: { Authorization: `Token ${token}` },
         withCredentials: true,
       });
@@ -151,7 +172,7 @@ const Profile = () => {
     try {
       const token = localStorage.getItem('token');
       const response = await axios.post(
-        'http://localhost:8000/api/utilisateurs/enable_2fa/',
+        `${API_BASE}/utilisateurs/enable_2fa/`,
         {},
         {
           headers: { Authorization: `Token ${token}` },
@@ -180,7 +201,7 @@ const Profile = () => {
     try {
       const token = localStorage.getItem('token');
       const response = await axios.post(
-        'http://localhost:8000/api/utilisateurs/disable_2fa/',
+        '${API_BASE}/utilisateurs/disable_2fa/',
         {},
         {
           headers: { Authorization: `Token ${token}` },
@@ -204,7 +225,7 @@ const Profile = () => {
     if (!window.confirm('Supprimer le compte admin ? Cette action est irréversible.')) return;
     try {
       const token = localStorage.getItem('token');
-      await axios.delete(`http://localhost:8000/api/utilisateurs/${user.id}/`, {
+      await axios.delete(`${API_BASE}/utilisateurs/${user.id}/`, {
         headers: { Authorization: `Token ${token}` },
         withCredentials: true,
       });

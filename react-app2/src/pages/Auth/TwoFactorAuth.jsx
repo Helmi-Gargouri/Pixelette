@@ -31,32 +31,34 @@ const TwoFactorAuth = () => {
               const userData = JSON.parse(storedUser);
               if (userData.role === 'admin') {
                 // Admin : utiliser TempAuthStorage pour redirection vers backoffice
-                const storeTempAndRedirect = async () => {
-                  try {
-                    const storeResponse = await axios.post(
-                      `${API_BASE}/auth/store_temp/`,
-                      {
-                        token: token,
-                        user: userData,
-                      },
-                      {
-                        withCredentials: true,
-                        headers: {
-                          'Content-Type': 'application/json',
-                        },
-                      }
-                    );
-                    const tempId = storeResponse.data.temp_id;
-                  if (tempId) {
-  window.location.href = `${BACKOFFICE_URL}/dashboard?temp_id=${encodeURIComponent(tempId)}`;
-} else {
-                      navigate('/');
-                    }
-                  } catch (error) {
-                    console.error('Erreur stockage temp:', error);
-                    navigate('/');
-                  }
-                };
+         // In TwoFactorAuth.jsx, update storeTempAndRedirect
+
+const storeTempAndRedirect = async () => {
+  try {
+    const storeResponse = await axios.post(
+      `${API_BASE}/auth/store_temp/`,
+      {
+        token: token,
+        user_data: userData,  // Change from user to user_data
+      },
+      {
+        withCredentials: true,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+    const tempId = storeResponse.data.temp_id;
+    if (tempId) {
+      window.location.href = `${BACKOFFICE_URL}/dashboard?temp_id=${encodeURIComponent(tempId)}`;
+    } else {
+      navigate('/');
+    }
+  } catch (error) {
+    console.error('Erreur stockage temp:', error);
+    navigate('/');
+  }
+};
                 storeTempAndRedirect();
               } else {
                 navigate('/');

@@ -881,6 +881,40 @@ class UtilisateurViewSet(viewsets.ModelViewSet):
                 {'error': str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+    @api_view(['POST'])
+    @permission_classes([AllowAny])
+    def store_temp(request):
+        token = request.data.get('token')
+        user_data = request.data.get('user_data')
+        temp_obj = TempAuthStorage.objects.create(token=token, user_data=user_data)
+        logger.info(f"[POST /api/auth/store_temp/] Stored with temp_id: {temp_obj.id}")
+        return Response({'temp_id': str(temp_obj.id)}, status=201)
+
+    @api_view(['GET'])
+    @permission_classes([AllowAny])
+    def exchange_temp(request):
+        temp_id = request.query_params.get('temp_id')
+        if not temp_id:
+            return Response({'error': 'temp_id manquant'}, status=400)
+
+        try:
+            temp_obj = TempAuthStorage.objects.get(id=temp_id)
+            if temp_obj.is_expired():
+                temp_obj.delete()
+                return Response({'error': 'temp_id expiré'}, status=400)
+
+            token = temp_obj.token
+            user_data = temp_obj.user_data
+
+            temp_obj.delete()  # Supprime après usage
+
+            return Response({
+                'token': token,
+                'user': user_data
+            })
+        except TempAuthStorage.DoesNotExist:
+            return Response({'error': 'temp_id invalide'}, status=400)
          
 class OeuvreViewSet(viewsets.ModelViewSet):
     queryset = Oeuvre.objects.all()
