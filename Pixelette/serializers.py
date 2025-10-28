@@ -1,8 +1,8 @@
 from rest_framework import serializers
-from .models import Utilisateur, Oeuvre, Galerie, Interaction, Statistique,  GalerieInvitation, SavedStat
+from .models import Utilisateur, Oeuvre, Galerie, Interaction, Statistique, DemandeRole, GalerieInvitation, SavedStat
 from django.contrib.auth.hashers import make_password  
 import pyotp
-from .models import Utilisateur, Oeuvre, Galerie, Interaction, Statistique, GalerieInvitation, Suivi
+from .models import Utilisateur, Oeuvre, Galerie, Interaction, Statistique, DemandeRole, GalerieInvitation, Suivi
 from .models import ConsultationOeuvre, PartageOeuvre, ContactArtiste
 
 class UtilisateurSerializer(serializers.ModelSerializer):

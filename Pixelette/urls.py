@@ -21,8 +21,9 @@ from django.conf import settings
 from django.conf.urls.static import static  
 from .views import (
     UtilisateurViewSet, OeuvreViewSet, GalerieViewSet, InteractionViewSet, 
-    StatistiqueViewSet,  SavedStatViewSet, , potify_auth_url, spotify_callback, whoami 
-     ,TempAuthStorageView
+    StatistiqueViewSet, DemandeRoleViewSet, SavedStatViewSet, spotify_create_playlist, 
+    spotify_auth_url, spotify_callback, whoami, SuiviViewSet,
+    ContactArtisteViewSet, ConsultationOeuvreViewSet,PartageOeuvreViewSet,TempAuthStorageView
 )
 from .views import users_by_date
 from .views import views_by_artist
@@ -37,7 +38,11 @@ router.register(r'galeries', GalerieViewSet)
 router.register(r'interactions', InteractionViewSet)
 router.register(r'statistiques', StatistiqueViewSet)
 router.register(r'saved-stats', SavedStatViewSet)
-
+router.register(r'demandes', DemandeRoleViewSet) 
+router.register(r'suivis', SuiviViewSet, basename='suivi') 
+router.register(r'contacts', ContactArtisteViewSet) 
+router.register(r'consultations', ConsultationOeuvreViewSet) 
+router.register(r'partages', PartageOeuvreViewSet) 
 
 
 urlpatterns = [
