@@ -20,7 +20,7 @@ const Profile = () => {
   const fileInputRef = useRef(null);
   const navigate = useNavigate();
   const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';  // Add this if not present
-
+  const FRONTOFFICE_URL = import.meta.env.VITE_FRONTOFFICE_URL || 'http://localhost:5173';
   useEffect(() => {
 
 const tempId = searchParams.get('temp_id');
@@ -96,7 +96,7 @@ setLoading(true);
       localStorage.clear();
       sessionStorage.clear();
       setTimeout(() => {
-        window.location.href = 'http://localhost:5173';
+      window.location.href = FRONTOFFICE_URL;
       }, 1500);
     } finally {
       setLoading(false);
@@ -237,7 +237,7 @@ setLoading(true);
       sessionStorage.clear();
       toast.success('Compte supprimé');
       setTimeout(() => {
-        window.location.href = 'http://localhost:5173';
+      window.location.href = FRONTOFFICE_URL;
       }, 1500);
     } catch (error) {
       toast.error('Erreur lors de la suppression');
@@ -249,7 +249,7 @@ setLoading(true);
     sessionStorage.clear();
     toast.success('Déconnexion réussie');
     setTimeout(() => {
-      window.location.href = 'http://localhost:5173';
+    window.location.href = FRONTOFFICE_URL;
     }, 1000);
   };
 
