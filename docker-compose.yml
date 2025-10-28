@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        user: pixelette
+        uid: 1000
+    image: pixelette-app:latest
+    container_name: pixelette-app
+    restart: unless-stopped
+    working_dir: /app
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./:/app
+    networks:
+      - pixelette-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      - DJANGO_SETTINGS_MODULE=Pixelette.settings
+      - DATABASE_URL=sqlite:////app/db.sqlite3
+    command: gunicorn --bind 0.0.0.0:8000 Pixelette.wsgi:application
+
+networks:
+  pixelette-network:
+    driver: bridge
