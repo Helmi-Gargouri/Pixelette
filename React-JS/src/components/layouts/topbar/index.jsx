@@ -142,10 +142,15 @@ const Topbar = () => {
   const navigate = useNavigate();
   const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
   const MEDIA_BASE = import.meta.env.VITE_MEDIA_URL || 'http://localhost:8000';  
+
+const handleLogout = async () => {
+  try {
     await logout();
-    // logout() dans AuthContext.jsx redirige déjà vers localhost:5173
-    // Pas besoin de navigate ici
-  };
+  } catch (error) {
+    console.error('Erreur lors de la déconnexion:', error);
+  }
+};
+ 
 
   // Construis l'URL de l'image correctement
   const getUserImage = () => {
