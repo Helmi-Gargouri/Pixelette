@@ -20,11 +20,9 @@ const Home = () => {
                     <h1 className="hero-title" data-ani="slider-custom-anim-right" data-ani-delay="0.15s">
                       PIXELETTE <span className="text-stroke">Pixelette</span>
                     </h1>
-                    <h1 className="hero-title" data-ani="slider-custom-anim-left" data-ani-delay="0.2s">
-                      Le monde de l'art
-                    </h1>
+        
                     <h1 className="hero-title title-bg-thumb" data-bg-src="/assets/img/hero/hero_1_text-bg.png" data-ani="slider-custom-anim-right" data-ani-delay="0.25s">
-                      Musée communautaire
+                      Le monde de l'art
                     </h1>
                     <div className="hero-social-wrap" data-ani="slider-custom-anim-left" data-ani-delay="0.3s">
                       <span>Suivez-nous : </span>
