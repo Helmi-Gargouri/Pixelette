@@ -48,6 +48,8 @@ router.register(r'partages', PartageOeuvreViewSet)
 urlpatterns = [
     path('admin/', admin.site.urls),
     # specific API routes first
+    path('api/auth/store_temp/', TempAuthStorageView.as_view(), name='store_temp_auth'),
+    path('api/auth/get_temp/<uuid:temp_id>/', TempAuthStorageView.as_view(), name='get_temp_auth'),
     path('api/stats/views-by-artist/', views_by_artist, name='views_by_artist'),
     path('api/', include(router.urls)),
     path('api/spotify/create-playlist/', spotify_create_playlist, name='spotify_create_playlist'),
@@ -58,8 +60,7 @@ urlpatterns = [
     path('api/stats/views-by-artist/', views_by_artist, name='views_by_artist'),
     path('api/reports/summary/', generate_summary_pdf, name='generate_summary_pdf'),
     path('api/ai/generate-chart/', ai_generate_chart, name='ai_generate_chart'),
-    path('api/auth/store_temp/', TempAuthStorageView.as_view(), name='store_temp_auth'),
-    path('api/auth/get_temp/<uuid:temp_id>/', TempAuthStorageView.as_view(), name='get_temp_auth'),
+
 ]
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

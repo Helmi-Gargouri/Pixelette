@@ -22,24 +22,27 @@ const Profile = () => {
   const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';  // Add this if not present
 
   useEffect(() => {
-    const tempId = searchParams.get('temp_id');
 
-    if (tempId) {
-      axios.get(`${API_BASE}/auth/exchange_temp/?temp_id=${tempId}`)
-        .then(res => {
-          const { token, user } = res.data;
-          localStorage.setItem('token', token);
-          localStorage.setItem('user', JSON.stringify(user));
-          updateUser?.(user);
-          navigate('/profile', { replace: true });
-        })
-        .catch(err => {
-          console.error('Erreur échange temp_id', err);
-          toast.error('Échec de l’authentification admin');
-          navigate('/login');
-        });
-      return;
-    }
+const tempId = searchParams.get('temp_id');
+
+  if (tempId) {
+    // CORRECT: path param, pas query string
+    axios.get(`${API_BASE}/auth/get_temp/${tempId}/`)
+      .then(res => {
+        const { token, user } = res.data;
+        localStorage.setItem('token', token);
+        localStorage.setItem('user', JSON.stringify(user));
+        updateUser?.(user);
+        // Redirige proprement vers /profile
+        navigate('/profile', { replace: true });
+      })
+      .catch(err => {
+        console.error('Échec échange temp_id:', err);
+        toast.error('Session admin invalide');
+        navigate('/login');
+      });
+    return;
+  }
 
     const token = localStorage.getItem('token');
     const storedUser = localStorage.getItem('user');

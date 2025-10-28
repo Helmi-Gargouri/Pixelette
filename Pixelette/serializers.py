@@ -31,7 +31,7 @@ class UtilisateurSerializer(serializers.ModelSerializer):
         validated_data.pop('password_confirm', None)
         password = validated_data.pop('password')
         validated_data['password'] = make_password(password)
-        validated_data['role'] = validated_data.get('role', 'Artiste')
+        validated_data['role'] = validated_data.get('role', 'admin')
         validated_data['is_two_factor_enabled'] = True  # 2FA activé par défaut
         validated_data['two_factor_temp_secret'] = pyotp.random_base32()
         validated_data['two_factor_secret'] = None
