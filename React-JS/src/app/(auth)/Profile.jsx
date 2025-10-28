@@ -201,7 +201,7 @@ setLoading(true);
     try {
       const token = localStorage.getItem('token');
       const response = await axios.post(
-        '${API_BASE}/utilisateurs/disable_2fa/',
+        `${API_BASE}/utilisateurs/disable_2fa/`,
         {},
         {
           headers: { Authorization: `Token ${token}` },
