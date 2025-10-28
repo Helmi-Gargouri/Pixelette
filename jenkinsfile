@@ -117,10 +117,8 @@ stage('SonarQube Analysis') {
     steps {
         script {
             echo "🔍 Analyse SonarQube..."
-            // Nom exact configuré dans "Manage Jenkins → Tools → SonarQube Scanner installations"
             def scannerHome = tool 'scanner'
 
-            // Nom exact configuré dans "Manage Jenkins → System → SonarQube servers"
             withSonarQubeEnv('sonarqube') {
                 timeout(time: 10, unit: 'MINUTES') {
                     sh """
@@ -128,17 +126,18 @@ stage('SonarQube Analysis') {
                         . venv/bin/activate
                         export NLTK_DATA=/tmp/nltk_data
 
-                        ${scannerHome}/bin/sonar-scanner \
-                            -Dsonar.projectKey=pixelette \
-                            -Dsonar.projectName=Pixelette \
-                            -Dsonar.host.url=http://192.168.33.10:9000 \
-                            -Dsonar.sources=Pixelette \
-                            -Dsonar.tests=Pixelette/tests \
-                            -Dsonar.python.coverage.reportPaths=build/reports/coverage/coverage.xml \
-                            -Dsonar.python.file.suffixes=py \
-                            -Dsonar.exclusions=**/migrations/**,**/static/**,**/media/**,**/admin/** \
-                            -Dsonar.sourceEncoding=UTF-8 \
-                            -Dsonar.verbose=true
+                    ${scannerHome}/bin/sonar-scanner \
+                        -Dsonar.projectKey=pixelette \
+                        -Dsonar.projectName=Pixelette \
+                        -Dsonar.host.url=http://192.168.33.10:9000 \
+                        -Dsonar.sources=Pixelette \
+                        -Dsonar.tests=Pixelette/tests \
+                        -Dsonar.python.coverage.reportPaths=build/reports/coverage/coverage.xml \
+                        -Dsonar.python.file.suffixes=py \
+                        -Dsonar.exclusions=**/migrations/**,**/static/**,**/media/**,**/admin/**,Pixelette/tests/** \
+                        -Dsonar.sourceEncoding=UTF-8 \
+                        -Dsonar.verbose=true
+
                     """
                 }
             }
