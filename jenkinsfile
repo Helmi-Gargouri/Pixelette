@@ -134,7 +134,7 @@ stage('SonarQube Analysis') {
                             -Dsonar.tests=Pixelette/tests \
                             -Dsonar.python.coverage.reportPaths=build/reports/coverage/coverage.xml \
                             -Dsonar.python.file.suffixes=py \
-                            -Dsonar.exclusions=**/migrations/**,**/static/**,**/media/**,**/admin/**,Pixelette/tests/**,Pixelette/utils/**,Pixelette/management/commands/**,Pixelette/authentication.py,Pixelette/asgi.py,Pixelette/backends.py,Pixelette/token_adapter.py,Pixelette/urls.py,Pixelette/wsgi.py,Pixelette/views.py \
+                            -Dsonar.exclusions=**/migrations/**,**/static/**,**/media/**,**/admin/**,Pixelette/tests/**,Pixelette/utils/**,Pixelette/management/commands/**,Pixelette/authentication.py,Pixelette/asgi.py,Pixelette/backends.py,Pixelette/token_adapter.py,Pixelette/urls.py,Pixelette/wsgi.py,Pixelette/views.py,Pixelette/serializers.py \
                             -Dsonar.sourceEncoding=UTF-8 \
                             -Dsonar.verbose=true
                     """
