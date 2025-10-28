@@ -86,7 +86,7 @@ const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
     
     try {
       const token = localStorage.getItem('token')
-      await axios.put(`http://localhost:8000/api/galeries/${id}/`, 
+      await axios.put(`${API_BASE}/galeries/${id}/`, 
         {
           ...formData,
           proprietaire: user.id
