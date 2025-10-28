@@ -716,16 +716,21 @@ class UtilisateurViewSet(viewsets.ModelViewSet):
         
         # Ajouter le statut de suivi pour chaque artiste si l'utilisateur est connecté
         artistes_data = serializer.data
-        if request.user.is_authenticated:
-            user_suivis = Suivi.objects.filter(utilisateur=request.user).values_list('artiste_id', flat=True)
-            for artiste in artistes_data:
-                artiste['is_followed'] = artiste['id'] in user_suivis
-                # Compter le nombre d'abonnés
-                artiste['followers_count'] = Suivi.objects.filter(artiste_id=artiste['id']).count()
-        else:
-            for artiste in artistes_data:
-                artiste['is_followed'] = False
-                artiste['followers_count'] = Suivi.objects.filter(artiste_id=artiste['id']).count()
+        
+        # Vérifier de manière sécurisée si l'utilisateur est authentifié
+        user_suivis = []
+        try:
+            if request.user and request.user.is_authenticated and isinstance(request.user, Utilisateur):
+                user_suivis = list(Suivi.objects.filter(utilisateur=request.user).values_list('artiste_id', flat=True))
+        except (AttributeError, ValueError, TypeError):
+            # L'utilisateur n'est pas correctement authentifié
+            pass
+        
+        # Ajouter les informations de suivi à chaque artiste
+        for artiste in artistes_data:
+            artiste['is_followed'] = artiste['id'] in user_suivis
+            # Compter le nombre d'abonnés
+            artiste['followers_count'] = Suivi.objects.filter(artiste_id=artiste['id']).count()
         
         return Response({
             'count': len(artistes_data),

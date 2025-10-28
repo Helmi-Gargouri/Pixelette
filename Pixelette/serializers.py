@@ -49,10 +49,19 @@ class UtilisateurSerializer(serializers.ModelSerializer):
         representation = super().to_representation(instance)
         if instance.image:
             request = self.context.get('request')
-            if request:
-                representation['image'] = request.build_absolute_uri(instance.image.url)
-            else:
-                representation['image'] = instance.image.url
+            try:
+                if request:
+                    representation['image'] = request.build_absolute_uri(instance.image.url)
+                else:
+                    representation['image'] = instance.image.url
+            except Exception:
+                # Si l'image n'existe pas (fichier supprimé sur Render), utiliser un avatar par défaut
+                nom_complet = f"{instance.prenom} {instance.nom}"
+                representation['image'] = f"https://ui-avatars.com/api/?name={nom_complet}&background=random&size=200"
+        else:
+            # Pas d'image définie, utiliser un avatar par défaut
+            nom_complet = f"{instance.prenom} {instance.nom}"
+            representation['image'] = f"https://ui-avatars.com/api/?name={nom_complet}&background=random&size=200"
         return representation
     
 class OeuvreSerializer(serializers.ModelSerializer):
