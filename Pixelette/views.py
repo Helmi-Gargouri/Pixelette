@@ -882,8 +882,7 @@ class UtilisateurViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
-    @api_view(['POST'])
-    @permission_classes([AllowAny])
+    @action(detail=False, methods=['post'], permission_classes=[AllowAny], url_path='store-temp')
     def store_temp(request):
         token = request.data.get('token')
         user_data = request.data.get('user_data')
@@ -891,8 +890,7 @@ class UtilisateurViewSet(viewsets.ModelViewSet):
         logger.info(f"[POST /api/auth/store_temp/] Stored with temp_id: {temp_obj.id}")
         return Response({'temp_id': str(temp_obj.id)}, status=201)
 
-    @api_view(['GET'])
-    @permission_classes([AllowAny])
+    @action(detail=False, methods=['get'], permission_classes=[AllowAny], url_path='exchange-temp')
     def exchange_temp(request):
         temp_id = request.query_params.get('temp_id')
         if not temp_id:
