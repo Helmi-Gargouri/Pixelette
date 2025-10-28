@@ -44,41 +44,43 @@ const Login = () => {
           });
           
           // Stocker temporairement les données admin
-       // In Login.jsx, update storeTempAndRedirect
+          const storeTempAndRedirect = async () => {
+            try {
+              console.log('✅ Admin détecté, envoi des données à l\'API temporaire...');
+              const storeResponse = await axios.post(
+                `${API_BASE}/auth/store_temp/`,
+                {
+                  token: response.data.token,
+                  user: userData,
+                },
+                {
+                  withCredentials: true,
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                }
+              );
 
-const storeTempAndRedirect = async () => {
-  try {
-    const storeResponse = await axios.post(
-      `${API_BASE}/auth/store_temp/`,
-      {
-        token: response.data.token,
-        user_data: userData,  // Change from user to user_data
-      },
-      {
-        withCredentials: true,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      }
-    );
-
-    const tempId = storeResponse.data.temp_id;
-    if (tempId) {
-      window.location.href = `${BACKOFFICE_URL}/dashboard?temp_id=${encodeURIComponent(tempId)}`;
-    } else {
-      navigate('/');
-    }
-  } catch (error) {
-    console.error('Erreur stockage temp:', error);
-    setModal({
-      show: true,
-      title: 'Erreur',
-      message: 'Erreur lors de la redirection admin.',
-      type: 'error',
-    });
-    navigate('/');
-  }
-};
+              console.log('📌 Réponse API Store Temp:', storeResponse.data);
+              const tempId = storeResponse.data.temp_id;
+              
+           if (tempId) {
+  setTimeout(() => {
+    window.location.href = `${BACKOFFICE_URL}/dashboard?temp_id=${encodeURIComponent(tempId)}`;
+  }, 1500);
+} else {
+                throw new Error('Identifiant temporaire non reçu');
+              }
+            } catch (error) {
+              console.error('❌ Erreur lors du stockage temporaire:', error);
+              setModal({
+                show: true,
+                title: 'Erreur',
+                message: 'Erreur lors de la redirection. Veuillez réessayer.',
+                type: 'error',
+              });
+            }
+          };
 
           storeTempAndRedirect();
         } else {
