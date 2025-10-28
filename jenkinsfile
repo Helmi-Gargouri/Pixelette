@@ -1,17 +1,17 @@
 pipeline {
-    agent any  // Agent with Python 3.10.12+, python3-venv, and Docker installed
+    agent any  
 
     options {
-        timeout(time: 20, unit: 'MINUTES')  // Global pipeline timeout
-        retry(2)  // Retry pipeline up to 2 times on failure
+        timeout(time: 20, unit: 'MINUTES')  
+        retry(2)  
     }
 
     environment {
-        SONAR_TOKEN = credentials('scanner')  // SonarQube token
-        registry = '192.168.33.10:8083'  // Nexus registry
-        registryCredentials = 'nexus'  // Credential ID for Nexus
-        imageName = 'pixelette-app'  // Image name
-        imageTag = '1.0'  // Default tag, overridden by BUILD_NUMBER
+        SONAR_TOKEN = credentials('scanner') 
+        registry = '192.168.33.10:8083'  
+        registryCredentials = 'nexus'  
+        imageName = 'pixelette-app'  
+        imageTag = '1.0' 
     }
 
     stages {
