@@ -1,0 +1,21 @@
+[
+  {
+    "model": "Pixelette.utilisateur",
+    "pk": 1,
+    "fields": {
+      "username": "testuser",
+      "email": "test@example.com",
+      "role": "user",
+      "is_two_factor_enabled": false
+    }
+  },
+  {
+    "model": "Pixelette.oeuvre",
+    "pk": 1,
+    "fields": {
+      "titre": "Test Art",
+      "artiste": 1,
+      "description": "A test artwork"
+    }
+  }
+]
